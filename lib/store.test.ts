@@ -29,11 +29,12 @@ describe('media lifecycle', () => {
     expect(m).toMatchObject({ status: 'ready', duration: 12, upload: { pct: 40, state: 'paused' } })
   })
 
-  it('marks undecodable media as error', () => {
+  it('marks undecodable media as error and attaches thumbnails', () => {
     seedMedia({ status: 'loading' })
+    dispatch({ type: 'THUMB_READY', id: 'm1', thumb: 'data:image/jpeg;base64,x' })
     dispatch({ type: 'MEDIA_ERROR', id: 'm1' })
     dispatch({ type: 'MEDIA_ERROR', id: 'nope' }) // unknown id is a no-op
-    expect(state().media.m1?.status).toBe('error')
+    expect(state().media.m1).toMatchObject({ status: 'error', thumb: 'data:image/jpeg;base64,x' })
   })
 
   it('attaches waveform peaks to existing media only', () => {

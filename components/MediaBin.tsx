@@ -51,13 +51,21 @@ export default function MediaBin() {
         )}
         {items.map((m) => (
           <div key={m.id} className="group rounded-lg border border-zinc-800 bg-zinc-900 p-2.5">
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="truncate text-xs font-medium text-zinc-200">{m.name}</span>
-              <span className="shrink-0 font-mono text-[10px] text-zinc-500">
-                {m.status === 'ready' && fmt(m.duration)}
-                {m.status === 'loading' && '…'}
-                {m.status === 'error' && <span className="text-rose-400">cannot decode</span>}
-              </span>
+            <div className="flex items-center gap-2.5">
+              {m.thumb ? (
+                // eslint-disable-next-line @next/next/no-img-element -- local data URL
+                <img src={m.thumb} alt="" className="h-9 w-16 shrink-0 rounded object-cover" />
+              ) : (
+                <div className="h-9 w-16 shrink-0 rounded bg-zinc-800" />
+              )}
+              <div className="min-w-0 flex-1">
+                <span className="block truncate text-xs font-medium text-zinc-200">{m.name}</span>
+                <span className="font-mono text-[10px] text-zinc-500">
+                  {m.status === 'ready' && fmt(m.duration)}
+                  {m.status === 'loading' && '…'}
+                  {m.status === 'error' && <span className="text-rose-400">cannot decode</span>}
+                </span>
+              </div>
             </div>
             <div className="mt-2 h-1 overflow-hidden rounded-full bg-zinc-800">
               <div

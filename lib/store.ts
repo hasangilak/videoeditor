@@ -14,6 +14,7 @@ export interface Media {
   status: 'loading' | 'ready' | 'error'
   upload: { pct: number; state: 'uploading' | 'paused' | 'done' | 'error' }
   waveform?: Float32Array // peak buckets, absent while extracting or if no audio
+  thumb?: string // small poster frame as data URL
 }
 
 export interface Clip {
@@ -54,6 +55,7 @@ export type Action =
   | { type: 'MEDIA_ADDED'; media: Media }
   | { type: 'MEDIA_READY'; id: string; duration: number }
   | { type: 'MEDIA_ERROR'; id: string }
+  | { type: 'THUMB_READY'; id: string; thumb: string }
   | { type: 'WAVEFORM_READY'; id: string; peaks: Float32Array }
   | { type: 'UPLOAD_PROGRESS'; id: string; pct: number }
   | { type: 'UPLOAD_STATE'; id: string; state: Media['upload']['state'] }
@@ -119,6 +121,12 @@ function reduce(s: State, a: Action): State {
       const m = s.media[a.id]
       if (!m) return s
       return { ...s, media: { ...s.media, [a.id]: { ...m, status: 'error' } } }
+    }
+
+    case 'THUMB_READY': {
+      const m = s.media[a.id]
+      if (!m) return s
+      return { ...s, media: { ...s.media, [a.id]: { ...m, thumb: a.thumb } } }
     }
 
     case 'WAVEFORM_READY': {

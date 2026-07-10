@@ -22,6 +22,19 @@ function probeDuration(id: string, url: string) {
   probe.onloadedmetadata = () => {
     pendingProbes.delete(id)
     dispatch({ type: 'MEDIA_READY', id, duration: probe.duration })
+    probe.currentTime = Math.min(1, probe.duration / 2) // grab a poster frame
+  }
+  probe.onseeked = () => {
+    const c = document.createElement('canvas')
+    const s = Math.max(160 / probe.videoWidth, 90 / probe.videoHeight) // cover
+    c.width = 160
+    c.height = 90
+    const ctx = c.getContext('2d')
+    if (!ctx || !probe.videoWidth) return
+    const w = probe.videoWidth * s
+    const h = probe.videoHeight * s
+    ctx.drawImage(probe, (160 - w) / 2, (90 - h) / 2, w, h)
+    dispatch({ type: 'THUMB_READY', id, thumb: c.toDataURL('image/jpeg', 0.6) })
   }
   probe.onerror = () => {
     pendingProbes.delete(id)
