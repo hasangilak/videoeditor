@@ -5,19 +5,21 @@ import { useEditor, activeClips, type Media } from '@/lib/store'
 const W = 1280
 const H = 720
 
-// decoder pool: one hidden <video> per media, module scope so it survives
-// route changes along with the store
+// decoder pool: one hidden <video> PER CLIP (not per media — two clips using
+// the same media at different offsets would fight over one element's
+// currentTime, a seek storm that never presents a frame). Module scope so it
+// survives route changes along with the store.
 const pool: Record<string, HTMLVideoElement> = {}
 
-function videoFor(media: Media) {
-  let v = pool[media.id]
+function videoFor(clipId: string, media: Media) {
+  let v = pool[clipId]
   if (!v) {
     v = document.createElement('video')
-    v.src = media.url
     v.preload = 'auto'
     v.playsInline = true
-    pool[media.id] = v
+    pool[clipId] = v
   }
+  if (v.src !== media.url) v.src = media.url // restore() mints fresh object URLs
   return v
 }
 
@@ -38,10 +40,15 @@ export default function Preview() {
       // fast lane: read state directly per frame, no React re-render
       const { doc, session, media } = useEditor.getState()
       const clips = activeClips(doc, session.playhead)
-      const activeIds = new Set(clips.map((c) => c.mediaId))
+      const activeIds = new Set(clips.map((c) => c.id))
 
-      for (const [id, v] of Object.entries(pool))
-        if (!activeIds.has(id) && !v.paused) v.pause()
+      for (const [id, v] of Object.entries(pool)) {
+        if (!doc.clips[id]) {
+          // clip deleted (or split renamed it) — release the decoder
+          v.removeAttribute('src')
+          delete pool[id]
+        } else if (!activeIds.has(id) && !v.paused) v.pause()
+      }
 
       ctx.fillStyle = '#000'
       ctx.fillRect(0, 0, W, H)
@@ -57,7 +64,7 @@ export default function Preview() {
       for (const clip of clips) {
         const m = media[clip.mediaId]
         if (!m) continue
-        const v = videoFor(m)
+        const v = videoFor(clip.id, m)
         const want = session.playhead - clip.start + clip.in
         // ponytail: rAF clock is master, videos drift-corrected — swap to
         // audio-clock master if lip-sync matters

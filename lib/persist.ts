@@ -77,7 +77,8 @@ export async function restore() {
       Object.entries(saved.doc.clips).filter(([, c]) => media[c.mediaId]),
     )
     dispatch({ type: 'RESTORED', doc: { clips }, media })
-  } catch {
+  } catch (err) {
     // corrupt or unavailable storage — start fresh rather than crash
+    console.error('[reel] restore failed:', err)
   }
 }
