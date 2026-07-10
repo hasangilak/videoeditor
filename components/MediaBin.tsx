@@ -54,7 +54,9 @@ export default function MediaBin() {
             <div className="flex items-baseline justify-between gap-2">
               <span className="truncate text-xs font-medium text-zinc-200">{m.name}</span>
               <span className="shrink-0 font-mono text-[10px] text-zinc-500">
-                {m.status === 'ready' ? fmt(m.duration) : '…'}
+                {m.status === 'ready' && fmt(m.duration)}
+                {m.status === 'loading' && '…'}
+                {m.status === 'error' && <span className="text-rose-400">cannot decode</span>}
               </span>
             </div>
             <div className="mt-2 h-1 overflow-hidden rounded-full bg-zinc-800">

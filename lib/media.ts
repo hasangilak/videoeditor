@@ -23,6 +23,10 @@ function probeDuration(id: string, url: string) {
     pendingProbes.delete(id)
     dispatch({ type: 'MEDIA_READY', id, duration: probe.duration })
   }
+  probe.onerror = () => {
+    pendingProbes.delete(id)
+    dispatch({ type: 'MEDIA_ERROR', id })
+  }
 }
 
 if (typeof document !== 'undefined')

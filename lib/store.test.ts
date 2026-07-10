@@ -29,6 +29,13 @@ describe('media lifecycle', () => {
     expect(m).toMatchObject({ status: 'ready', duration: 12, upload: { pct: 40, state: 'paused' } })
   })
 
+  it('marks undecodable media as error', () => {
+    seedMedia({ status: 'loading' })
+    dispatch({ type: 'MEDIA_ERROR', id: 'm1' })
+    dispatch({ type: 'MEDIA_ERROR', id: 'nope' }) // unknown id is a no-op
+    expect(state().media.m1?.status).toBe('error')
+  })
+
   it('attaches waveform peaks to existing media only', () => {
     seedMedia()
     const peaks = new Float32Array([0.5, 1])

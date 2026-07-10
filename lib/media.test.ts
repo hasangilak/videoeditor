@@ -85,6 +85,26 @@ describe('importFiles', () => {
     })
   })
 
+  it('marks media as error when the probe cannot decode it', () => {
+    // drain probes left pending by earlier tests so counts are deterministic
+    document.dispatchEvent(new Event('visibilitychange'))
+    for (const p of probes) {
+      Object.defineProperty(p, 'duration', { value: 1, configurable: true })
+      p.onloadedmetadata?.(new Event('loadedmetadata'))
+    }
+    probes.length = 0
+
+    const id = importOne()
+    const probe = probes[0]
+    if (!probe) throw new Error('no probe element created')
+    probe.onerror!(new Event('error'))
+    expect(mediaOf(id).status).toBe('error')
+    // resolved as error — visibility flips must not re-probe it
+    const before = probes.length
+    document.dispatchEvent(new Event('visibilitychange'))
+    expect(probes.length).toBe(before)
+  })
+
   it('marks media ready when the browser probe reports duration', () => {
     const id = importOne()
     const probe = probes[0]

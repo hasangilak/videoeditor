@@ -11,7 +11,7 @@ export interface Media {
   name: string
   url: string // local object URL — playback never touches the server
   duration: number
-  status: 'loading' | 'ready'
+  status: 'loading' | 'ready' | 'error'
   upload: { pct: number; state: 'uploading' | 'paused' | 'done' | 'error' }
   waveform?: Float32Array // peak buckets, absent while extracting or if no audio
 }
@@ -53,6 +53,7 @@ export interface State {
 export type Action =
   | { type: 'MEDIA_ADDED'; media: Media }
   | { type: 'MEDIA_READY'; id: string; duration: number }
+  | { type: 'MEDIA_ERROR'; id: string }
   | { type: 'WAVEFORM_READY'; id: string; peaks: Float32Array }
   | { type: 'UPLOAD_PROGRESS'; id: string; pct: number }
   | { type: 'UPLOAD_STATE'; id: string; state: Media['upload']['state'] }
@@ -112,6 +113,12 @@ function reduce(s: State, a: Action): State {
         ...s,
         media: { ...s.media, [a.id]: { ...m, duration: a.duration, status: 'ready' } },
       }
+    }
+
+    case 'MEDIA_ERROR': {
+      const m = s.media[a.id]
+      if (!m) return s
+      return { ...s, media: { ...s.media, [a.id]: { ...m, status: 'error' } } }
     }
 
     case 'WAVEFORM_READY': {
