@@ -81,7 +81,13 @@ export default function Preview() {
 
   return (
     <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-xl border border-zinc-800 bg-black">
-      <canvas ref={canvas} width={W} height={H} className="h-full w-full object-contain" />
+      <canvas
+        id="preview-canvas"
+        ref={canvas}
+        width={W}
+        height={H}
+        className="h-full w-full object-contain"
+      />
     </div>
   )
 }

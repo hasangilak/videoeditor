@@ -1,14 +1,25 @@
 'use client'
+import { useState } from 'react'
 import { useEditor, dispatch, docDuration } from '@/lib/store'
+import { exportTimeline } from '@/lib/export'
 import { fmt } from '@/lib/format'
 
 export default function Transport() {
   const playing = useEditor((s) => s.session.playing)
   const playhead = useEditor((s) => s.session.playhead)
   const duration = useEditor((s) => docDuration(s.doc))
+  const [exporting, setExporting] = useState(false)
+
+  const onExport = async () => {
+    const canvas = document.getElementById('preview-canvas')
+    if (!(canvas instanceof HTMLCanvasElement)) return
+    setExporting(true)
+    await exportTimeline(canvas)
+    setExporting(false)
+  }
 
   return (
-    <div className="flex items-center justify-center gap-4 rounded-xl border border-zinc-800 bg-zinc-900/60 px-4 py-2.5">
+    <div className="relative flex items-center justify-center gap-4 rounded-xl border border-zinc-800 bg-zinc-900/60 px-4 py-2.5">
       <button
         onClick={() => dispatch({ type: 'SEEK', time: 0 })}
         className="text-zinc-400 transition hover:text-white"
@@ -36,6 +47,14 @@ export default function Transport() {
       <span className="font-mono text-xs tabular-nums text-zinc-400">
         <span className="text-zinc-100">{fmt(playhead)}</span> / {fmt(duration)}
       </span>
+      <button
+        onClick={onExport}
+        disabled={exporting || playing || duration === 0}
+        className="absolute right-3 rounded-md bg-zinc-800 px-3 py-1 text-xs font-medium text-zinc-200 transition hover:bg-zinc-700 disabled:opacity-40"
+        title="Play the timeline through and save it as .webm"
+      >
+        {exporting ? 'Exporting…' : 'Export'}
+      </button>
     </div>
   )
 }
