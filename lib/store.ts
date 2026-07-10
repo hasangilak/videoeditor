@@ -62,6 +62,7 @@ export type Action =
   | { type: 'UPLOAD_STATE'; id: string; state: Media['upload']['state'] }
   | { type: 'CLIP_ADDED'; mediaId: string; trackId: TrackId }
   | { type: 'CLIP_REMOVED'; clipId: string }
+  | { type: 'SPLIT_AT'; time: number } // razor: selected clip if under the cut, else all clips there
   | { type: 'DRAG_MOVED'; drag: Drag } // ephemeral: writes session only, 1 undo step per gesture
   | { type: 'DRAG_COMMITTED' }
   | { type: 'DRAG_CANCELLED' }
@@ -177,6 +178,24 @@ function reduce(s: State, a: Action): State {
           selection: s.session.selection === a.clipId ? null : s.session.selection,
         },
       }
+    }
+
+    case 'SPLIT_AT': {
+      // ignore cuts at the very edge — they'd leave sub-frame slivers
+      const under = Object.values(s.doc.clips).filter(
+        (c) => c.start + 0.05 < a.time && a.time < clipEnd(c) - 0.05,
+      )
+      const selected = under.filter((c) => c.id === s.session.selection)
+      const targets = selected.length ? selected : under
+      if (!targets.length) return s
+      const clips = { ...s.doc.clips }
+      for (const c of targets) {
+        const cut = c.in + (a.time - c.start)
+        clips[c.id] = { ...c, out: cut }
+        const id = crypto.randomUUID()
+        clips[id] = { ...c, id, start: a.time, in: cut }
+      }
+      return commit(s, { clips })
     }
 
     case 'DRAG_MOVED':

@@ -93,6 +93,43 @@ describe('clips', () => {
   })
 })
 
+describe('split', () => {
+  beforeEach(() => {
+    seedMedia()
+    dispatch({ type: 'CLIP_ADDED', mediaId: 'm1', trackId: 'v1' }) // 0..10
+  })
+
+  it('cuts the clip under the playhead into two continuous clips, one undo step', () => {
+    dispatch({ type: 'SPLIT_AT', time: 4 })
+    const clips = Object.values(state().doc.clips).sort((a, b) => a.start - b.start)
+    expect(clips).toHaveLength(2)
+    expect(clips[0]).toMatchObject({ start: 0, in: 0, out: 4 })
+    expect(clips[1]).toMatchObject({ start: 4, in: 4, out: 10 })
+
+    dispatch({ type: 'UNDO' })
+    expect(Object.values(state().doc.clips)).toHaveLength(1)
+  })
+
+  it('no-ops at clip edges and in empty timeline space', () => {
+    dispatch({ type: 'SPLIT_AT', time: 0 })
+    dispatch({ type: 'SPLIT_AT', time: 10 })
+    dispatch({ type: 'SPLIT_AT', time: 25 })
+    expect(Object.values(state().doc.clips)).toHaveLength(1)
+  })
+
+  it('cuts only the selected clip when the cut crosses several', () => {
+    dispatch({ type: 'CLIP_ADDED', mediaId: 'm1', trackId: 'v2' }) // also 0..10
+    const v2 = Object.values(state().doc.clips).find((c) => c.trackId === 'v2')!
+    dispatch({ type: 'SELECT', clipId: v2.id })
+    dispatch({ type: 'SPLIT_AT', time: 5 })
+
+    const byTrack = (t: string) =>
+      Object.values(state().doc.clips).filter((c) => c.trackId === t)
+    expect(byTrack('v2')).toHaveLength(2)
+    expect(byTrack('v1')).toHaveLength(1) // untouched
+  })
+})
+
 describe('drag gesture', () => {
   let id: string
   beforeEach(() => {

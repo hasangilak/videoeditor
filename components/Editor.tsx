@@ -34,6 +34,8 @@ function useKeyboard() {
         dispatch({ type: s.playing ? 'PAUSE' : 'PLAY' })
       } else if ((e.key === 'Backspace' || e.key === 'Delete') && s.selection) {
         dispatch({ type: 'CLIP_REMOVED', clipId: s.selection })
+      } else if (e.key.toLowerCase() === 's' && !e.metaKey && !e.ctrlKey) {
+        dispatch({ type: 'SPLIT_AT', time: s.playhead })
       } else if (e.key === 'z' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault()
         dispatch({ type: e.shiftKey ? 'REDO' : 'UNDO' })

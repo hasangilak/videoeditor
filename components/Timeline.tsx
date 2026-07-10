@@ -63,6 +63,29 @@ export default function Timeline() {
     dispatch({ type: 'SEEK', time: timeAt(e.clientX) })
   }
 
+  // drag on the track area pans the timeline; a plain click still seeks
+  const pan = (e: React.PointerEvent) => {
+    const el = scroller.current
+    if (!el) return
+    const x0 = e.clientX
+    const scroll0 = el.scrollLeft
+    let moved = false
+    const move = (ev: PointerEvent) => {
+      if (Math.abs(ev.clientX - x0) > 3) moved = true
+      if (moved) el.scrollLeft = scroll0 - (ev.clientX - x0)
+    }
+    const up = (ev: PointerEvent) => {
+      if (!moved) {
+        dispatch({ type: 'PAUSE' })
+        dispatch({ type: 'SEEK', time: timeAt(ev.clientX) })
+      }
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
+
   const startClipDrag = (e: React.PointerEvent, clip: Clip, mode: Drag['mode']) => {
     e.stopPropagation()
     e.currentTarget.setPointerCapture(e.pointerId)
@@ -101,6 +124,16 @@ export default function Timeline() {
       <div className="flex items-center justify-between border-b border-zinc-800 px-3 py-1.5">
         <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-400">Timeline</h2>
         <div className="flex items-center gap-2 text-zinc-400">
+          <button
+            onClick={() =>
+              dispatch({ type: 'SPLIT_AT', time: useEditor.getState().session.playhead })
+            }
+            className="rounded px-1.5 text-xs hover:bg-zinc-800"
+            title="Split clip at playhead (S)"
+          >
+            ✂
+          </button>
+          <span className="mx-1 h-3 w-px bg-zinc-800" />
           <button
             onClick={() => dispatch({ type: 'UNDO' })}
             className="rounded px-1.5 text-xs hover:bg-zinc-800"
@@ -146,8 +179,8 @@ export default function Timeline() {
           {TRACKS.map((trackId, row) => (
             <div
               key={trackId}
-              onPointerDown={scrub}
-              className="absolute right-0 left-0 rounded-md bg-zinc-950/60"
+              onPointerDown={pan}
+              className="absolute right-0 left-0 cursor-grab rounded-md bg-zinc-950/60 active:cursor-grabbing"
               style={{ top: RULER_H + 8 + row * (TRACK_H + 8), height: TRACK_H }}
             >
               <span className="absolute top-1 left-1.5 z-10 font-mono text-[9px] text-zinc-600">
@@ -183,12 +216,16 @@ export default function Timeline() {
                       </span>
                       <div
                         onPointerDown={(e) => startClipDrag(e, c, 'trim-l')}
-                        className="absolute inset-y-0 left-0 w-2 cursor-ew-resize bg-white/0 transition group-hover:bg-white/25"
-                      />
+                        className="absolute inset-y-0 left-0 flex w-2.5 cursor-ew-resize items-center justify-center rounded-l-lg bg-black/30 opacity-70 transition group-hover:opacity-100"
+                      >
+                        <div className="h-4 w-0.5 rounded bg-white/80" />
+                      </div>
                       <div
                         onPointerDown={(e) => startClipDrag(e, c, 'trim-r')}
-                        className="absolute inset-y-0 right-0 w-2 cursor-ew-resize bg-white/0 transition group-hover:bg-white/25"
-                      />
+                        className="absolute inset-y-0 right-0 flex w-2.5 cursor-ew-resize items-center justify-center rounded-r-lg bg-black/30 opacity-70 transition group-hover:opacity-100"
+                      >
+                        <div className="h-4 w-0.5 rounded bg-white/80" />
+                      </div>
                     </div>
                   )
                 })}
