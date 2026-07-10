@@ -42,7 +42,7 @@ function ClipWave({
   )
 }
 
-export default function Timeline() {
+export default function Timeline({ height }: { height: number }) {
   const doc = useEditor((s) => s.doc)
   const { playhead, pxPerSec, selection, drag } = useEditor((s) => s.session)
   const media = useEditor((s) => s.media)
@@ -120,7 +120,10 @@ export default function Timeline() {
   const marks = Array.from({ length: Math.ceil(width / pxPerSec / labelStep) }, (_, i) => i * labelStep)
 
   return (
-    <div className="flex h-56 shrink-0 flex-col rounded-xl border border-zinc-800 bg-zinc-900/60">
+    <div
+      className="flex shrink-0 flex-col rounded-xl border border-zinc-800 bg-zinc-900/60"
+      style={{ height }}
+    >
       <div className="flex items-center justify-between border-b border-zinc-800 px-3 py-1.5">
         <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-400">Timeline</h2>
         <div className="flex items-center gap-2 text-zinc-400">

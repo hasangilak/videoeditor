@@ -1,5 +1,5 @@
 'use client'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useEditor, dispatch } from '@/lib/store'
 import { restore, startAutosave } from '@/lib/persist'
 import MediaBin from './MediaBin'
@@ -54,8 +54,25 @@ export default function Editor() {
     return startAutosave()
   }, [])
 
+  // splitter between preview and timeline: drag up/down to trade space
+  const [timelineH, setTimelineH] = useState(224)
+  const startResize = (e: React.PointerEvent) => {
+    const y0 = e.clientY
+    const h0 = timelineH
+    const move = (ev: PointerEvent) => {
+      const max = window.innerHeight - 260 // keep the preview usable
+      setTimelineH(Math.min(max, Math.max(120, h0 - (ev.clientY - y0))))
+    }
+    const up = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
+    <div className="flex min-h-0 flex-1 flex-col p-3">
       <div className="flex min-h-0 flex-1 gap-3">
         <MediaBin />
         <main className="flex min-w-0 flex-1 flex-col gap-3">
@@ -64,7 +81,15 @@ export default function Editor() {
         </main>
       </div>
 
-      <Timeline />
+      <div
+        onPointerDown={startResize}
+        className="group flex h-3 shrink-0 cursor-row-resize items-center justify-center"
+        title="Drag to resize"
+      >
+        <div className="h-1 w-24 rounded-full bg-zinc-800 transition group-hover:bg-indigo-500 group-active:bg-indigo-400" />
+      </div>
+
+      <Timeline height={timelineH} />
     </div>
   )
 }
