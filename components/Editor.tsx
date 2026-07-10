@@ -1,6 +1,7 @@
 'use client'
 import { useEffect } from 'react'
 import { useEditor, dispatch } from '@/lib/store'
+import { restore, startAutosave } from '@/lib/persist'
 import MediaBin from './MediaBin'
 import Preview from './Preview'
 import Transport from './Transport'
@@ -46,6 +47,10 @@ function useKeyboard() {
 export default function Editor() {
   usePlaybackEngine()
   useKeyboard()
+  useEffect(() => {
+    restore()
+    return startAutosave()
+  }, [])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">

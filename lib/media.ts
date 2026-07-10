@@ -2,6 +2,7 @@
 import * as tus from 'tus-js-client'
 import { dispatch } from './store'
 import { extractPeaks } from './waveform'
+import { saveFile } from './persist'
 
 // Uploads live here, at module scope — outside React entirely. Client-side
 // route changes unmount components, never this module, so no portal/worker
@@ -14,7 +15,7 @@ const uploads: Record<string, tus.Upload> = {}
 // in 'loading'. Track unresolved probes and re-probe on tab visibility.
 const pendingProbes = new Map<string, string>()
 
-function probeDuration(id: string, url: string) {
+export function probeDuration(id: string, url: string) {
   pendingProbes.set(id, url)
   const probe = document.createElement('video')
   probe.preload = 'metadata'
@@ -68,6 +69,9 @@ export function importFiles(files: Iterable<File>) {
 
     // probe duration in the browser — the backend never processes anything
     probeDuration(id, url)
+
+    // keep the bytes locally so the project survives a reload
+    saveFile(id, file).catch(() => {})
 
     // ponytail: decodeAudioData buffers the whole file, so skip huge ones;
     // upgrade path is a streaming decoder in a worker

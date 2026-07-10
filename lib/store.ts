@@ -57,6 +57,7 @@ export type Action =
   | { type: 'MEDIA_ERROR'; id: string }
   | { type: 'THUMB_READY'; id: string; thumb: string }
   | { type: 'WAVEFORM_READY'; id: string; peaks: Float32Array }
+  | { type: 'RESTORED'; doc: Doc; media: Record<string, Media> }
   | { type: 'UPLOAD_PROGRESS'; id: string; pct: number }
   | { type: 'UPLOAD_STATE'; id: string; state: Media['upload']['state'] }
   | { type: 'CLIP_ADDED'; mediaId: string; trackId: TrackId }
@@ -134,6 +135,9 @@ function reduce(s: State, a: Action): State {
       if (!m) return s
       return { ...s, media: { ...s.media, [a.id]: { ...m, waveform: a.peaks } } }
     }
+
+    case 'RESTORED':
+      return { ...s, doc: a.doc, media: a.media, history: { past: [], future: [] } }
 
     case 'UPLOAD_PROGRESS':
     case 'UPLOAD_STATE': {

@@ -37,6 +37,18 @@ describe('media lifecycle', () => {
     expect(state().media.m1).toMatchObject({ status: 'error', thumb: 'data:image/jpeg;base64,x' })
   })
 
+  it('RESTORED replaces doc and media with empty history', () => {
+    seedMedia()
+    dispatch({ type: 'CLIP_ADDED', mediaId: 'm1', trackId: 'v1' })
+    const doc = state().doc
+    const media = state().media
+    resetStore()
+    dispatch({ type: 'RESTORED', doc, media })
+    expect(state().doc).toBe(doc)
+    expect(state().media).toBe(media)
+    expect(state().history.past).toHaveLength(0)
+  })
+
   it('attaches waveform peaks to existing media only', () => {
     seedMedia()
     const peaks = new Float32Array([0.5, 1])
