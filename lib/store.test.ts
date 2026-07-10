@@ -29,6 +29,15 @@ describe('media lifecycle', () => {
     expect(m).toMatchObject({ status: 'ready', duration: 12, upload: { pct: 40, state: 'paused' } })
   })
 
+  it('attaches waveform peaks to existing media only', () => {
+    seedMedia()
+    const peaks = new Float32Array([0.5, 1])
+    dispatch({ type: 'WAVEFORM_READY', id: 'm1', peaks })
+    dispatch({ type: 'WAVEFORM_READY', id: 'nope', peaks })
+    expect(state().media.m1?.waveform).toBe(peaks)
+    expect(Object.keys(state().media)).toEqual(['m1'])
+  })
+
   it('ignores upload actions for unknown media', () => {
     dispatch({ type: 'UPLOAD_PROGRESS', id: 'nope', pct: 50 })
     expect(state().media).toEqual({})

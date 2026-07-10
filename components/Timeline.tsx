@@ -1,10 +1,46 @@
 'use client'
-import { useRef } from 'react'
-import { useEditor, dispatch, docDuration, TRACKS, type Clip, type Drag } from '@/lib/store'
+import { useEffect, useRef } from 'react'
+import { useEditor, dispatch, docDuration, TRACKS, type Clip, type Drag, type Media } from '@/lib/store'
 import { fmt } from '@/lib/format'
+import { drawWaveform } from '@/lib/waveform'
 
 const RULER_H = 24
 const TRACK_H = 56
+
+const WAVE_H = 26
+
+function ClipWave({
+  media,
+  from,
+  to,
+  width,
+}: {
+  media: Media | undefined
+  from: number
+  to: number
+  width: number // clip width in CSS px — canvas renders at this size, not stretched
+}) {
+  const ref = useRef<HTMLCanvasElement>(null)
+  const peaks = media?.waveform
+  useEffect(() => {
+    const c = ref.current
+    if (!c || !peaks) return
+    const dpr = window.devicePixelRatio || 1
+    // ponytail: canvas capped at 8k device px; CSS stretches past that (only
+    // hit on very long clips at high zoom) — tile canvases if it ever matters
+    c.width = Math.max(1, Math.min(8192, Math.round(width * dpr)))
+    c.height = Math.round(WAVE_H * dpr)
+    drawWaveform(c, peaks, { color: 'rgba(255,255,255,0.45)', from, to })
+  }, [peaks, from, to, width])
+  if (!peaks) return null
+  return (
+    <canvas
+      ref={ref}
+      className="pointer-events-none absolute inset-x-0 bottom-0 w-full"
+      style={{ height: WAVE_H }}
+    />
+  )
+}
 
 export default function Timeline() {
   const doc = useEditor((s) => s.doc)
@@ -122,6 +158,7 @@ export default function Timeline() {
                 .map((c) => {
                   // render from ghost values while this clip is mid-gesture
                   const g = drag?.clipId === c.id ? drag : c
+                  const m = media[c.mediaId]
                   const selected = selection === c.id
                   return (
                     <div
@@ -133,8 +170,14 @@ export default function Timeline() {
                       style={{ left: g.start * pxPerSec, width: (g.out - g.in) * pxPerSec }}
                     >
                       <span className="pointer-events-none absolute inset-x-2 top-1.5 truncate text-[10px] font-medium text-white/90">
-                        {media[c.mediaId]?.name}
+                        {m?.name}
                       </span>
+                      <ClipWave
+                        media={m}
+                        from={m ? g.in / m.duration : 0}
+                        to={m ? g.out / m.duration : 1}
+                        width={(g.out - g.in) * pxPerSec}
+                      />
                       <span className="pointer-events-none absolute bottom-1 left-2 font-mono text-[9px] text-white/50">
                         {fmt(g.out - g.in)}
                       </span>

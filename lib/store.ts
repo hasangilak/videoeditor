@@ -13,6 +13,7 @@ export interface Media {
   duration: number
   status: 'loading' | 'ready'
   upload: { pct: number; state: 'uploading' | 'paused' | 'done' | 'error' }
+  waveform?: Float32Array // peak buckets, absent while extracting or if no audio
 }
 
 export interface Clip {
@@ -52,6 +53,7 @@ export interface State {
 export type Action =
   | { type: 'MEDIA_ADDED'; media: Media }
   | { type: 'MEDIA_READY'; id: string; duration: number }
+  | { type: 'WAVEFORM_READY'; id: string; peaks: Float32Array }
   | { type: 'UPLOAD_PROGRESS'; id: string; pct: number }
   | { type: 'UPLOAD_STATE'; id: string; state: Media['upload']['state'] }
   | { type: 'CLIP_ADDED'; mediaId: string; trackId: TrackId }
@@ -110,6 +112,12 @@ function reduce(s: State, a: Action): State {
         ...s,
         media: { ...s.media, [a.id]: { ...m, duration: a.duration, status: 'ready' } },
       }
+    }
+
+    case 'WAVEFORM_READY': {
+      const m = s.media[a.id]
+      if (!m) return s
+      return { ...s, media: { ...s.media, [a.id]: { ...m, waveform: a.peaks } } }
     }
 
     case 'UPLOAD_PROGRESS':

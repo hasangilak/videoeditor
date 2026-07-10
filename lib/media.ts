@@ -1,6 +1,7 @@
 'use client'
 import * as tus from 'tus-js-client'
 import { dispatch } from './store'
+import { extractPeaks } from './waveform'
 
 // Uploads live here, at module scope — outside React entirely. Client-side
 // route changes unmount components, never this module, so no portal/worker
@@ -50,6 +51,13 @@ export function importFiles(files: Iterable<File>) {
 
     // probe duration in the browser — the backend never processes anything
     probeDuration(id, url)
+
+    // ponytail: decodeAudioData buffers the whole file, so skip huge ones;
+    // upgrade path is a streaming decoder in a worker
+    if (file.size <= 200 * 1024 * 1024)
+      extractPeaks(file).then(
+        (peaks) => peaks && dispatch({ type: 'WAVEFORM_READY', id, peaks }),
+      )
 
     const upload = new tus.Upload(file, {
       endpoint: '/api/tus',
