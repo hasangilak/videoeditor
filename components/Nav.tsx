@@ -9,6 +9,7 @@ const LINKS = [
 
 export default function Nav() {
   const path = usePathname()
+  if (path === '/') return null // editor is full-bleed; it has its own floating chrome
   return (
     <nav className="flex items-center justify-between border-b border-zinc-800/80 bg-zinc-950 px-4 py-2">
       <h1 className="flex items-center gap-2 text-sm font-semibold tracking-tight">

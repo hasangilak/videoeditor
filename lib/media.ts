@@ -1,8 +1,8 @@
 'use client'
 import * as tus from 'tus-js-client'
-import { dispatch } from './store'
+import { dispatch, useEditor } from './store'
 import { extractPeaks } from './waveform'
-import { saveFile } from './persist'
+import { saveFile, deleteFile } from './persist'
 
 // Uploads live here, at module scope — outside React entirely. Client-side
 // route changes unmount components, never this module, so no portal/worker
@@ -104,6 +104,18 @@ export function importFiles(files: Iterable<File>) {
       upload.start()
     })
   }
+}
+
+/** Remove an import everywhere: store (+ its clips), in-flight upload, local bytes. */
+export function removeMedia(id: string) {
+  uploads[id]?.abort()
+  delete uploads[id]
+  pendingProbes.delete(id)
+  const url = useEditor.getState().media[id]?.url
+  dispatch({ type: 'MEDIA_REMOVED', id })
+  if (url) URL.revokeObjectURL(url)
+  // ponytail: bytes already uploaded stay on the server; add tus termination if it matters
+  deleteFile(id).catch(() => {})
 }
 
 export function pauseUpload(id: string) {

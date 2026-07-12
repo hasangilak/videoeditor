@@ -1,13 +1,13 @@
 'use client'
-import { useEffect, useRef } from 'react'
-import { useEditor, dispatch, docDuration, TRACKS, type Clip, type Drag, type Media } from '@/lib/store'
+import { useEffect, useRef, useState } from 'react'
+import { useEditor, dispatch, docDuration, activeClip, TRACKS, type Clip, type Drag, type Media } from '@/lib/store'
 import { fmt } from '@/lib/format'
 import { drawWaveform } from '@/lib/waveform'
 
-const RULER_H = 24
-const TRACK_H = 56
+const RULER_H = 48
+const TRACK_H = 64
 
-const WAVE_H = 26
+const WAVE_H = 20
 
 function ClipWave({
   media,
@@ -30,7 +30,7 @@ function ClipWave({
     // hit on very long clips at high zoom) — tile canvases if it ever matters
     c.width = Math.max(1, Math.min(8192, Math.round(width * dpr)))
     c.height = Math.round(WAVE_H * dpr)
-    drawWaveform(c, peaks, { color: 'rgba(255,255,255,0.45)', from, to })
+    drawWaveform(c, peaks, { color: 'rgba(255,255,255,0.55)', from, to })
   }, [peaks, from, to, width])
   if (!peaks) return null
   return (
@@ -42,11 +42,57 @@ function ClipWave({
   )
 }
 
-export default function Timeline({ height }: { height: number }) {
+const THUMB_W = 160
+const THUMB_H = 90
+
+// one shared hidden <video> for hover scrubbing — only one tooltip exists at a time
+let hoverV: HTMLVideoElement | null = null
+
+function HoverThumb({ time }: { time: number }) {
+  const doc = useEditor((s) => s.doc)
+  const media = useEditor((s) => s.media)
+  const ref = useRef<HTMLCanvasElement>(null)
+  const clip = activeClip(doc, time)
+  const m = clip ? media[clip.mediaId] : undefined
+
+  useEffect(() => {
+    if (!clip || !m) return
+    if (!hoverV) {
+      hoverV = document.createElement('video')
+      hoverV.preload = 'auto'
+      hoverV.muted = true
+    }
+    const v = hoverV
+    if (v.src !== m.url) v.src = m.url
+    const want = time - clip.start + clip.in
+    const draw = () => {
+      const ctx = ref.current?.getContext('2d')
+      if (!ctx || !v.videoWidth) return
+      const s = Math.min(THUMB_W / v.videoWidth, THUMB_H / v.videoHeight)
+      const w = v.videoWidth * s
+      const h = v.videoHeight * s
+      ctx.fillStyle = '#000'
+      ctx.fillRect(0, 0, THUMB_W, THUMB_H)
+      ctx.drawImage(v, (THUMB_W - w) / 2, (THUMB_H - h) / 2, w, h)
+    }
+    // coalesce seeks: while one is in flight, onseeked re-aims at the latest want
+    v.onseeked = () => (Math.abs(v.currentTime - want) > 0.05 ? void (v.currentTime = want) : draw())
+    if (!v.seeking) {
+      if (Math.abs(v.currentTime - want) > 0.05) v.currentTime = want
+      else draw()
+    }
+  }, [clip, m, time])
+
+  if (!m) return null
+  return <canvas ref={ref} width={THUMB_W} height={THUMB_H} className="block" />
+}
+
+export default function Timeline() {
   const doc = useEditor((s) => s.doc)
   const { playhead, pxPerSec, selection, drag } = useEditor((s) => s.session)
   const media = useEditor((s) => s.media)
   const scroller = useRef<HTMLDivElement>(null)
+  const [hover, setHover] = useState<number | null>(null) // hovered time (s)
 
   const duration = docDuration(doc)
   const width = Math.max(duration + 10, 30) * pxPerSec
@@ -118,130 +164,148 @@ export default function Timeline({ height }: { height: number }) {
 
   const labelStep = Math.max(1, Math.round(80 / pxPerSec))
   const marks = Array.from({ length: Math.ceil(width / pxPerSec / labelStep) }, (_, i) => i * labelStep)
+  const label = (t: number) => (t < 60 ? `${t}s` : fmt(t))
 
   return (
     <div
-      className="flex shrink-0 flex-col rounded-xl border border-zinc-800 bg-zinc-900/60"
-      style={{ height }}
+      ref={scroller}
+      onPointerMove={(e) => setHover(timeAt(e.clientX))}
+      onPointerLeave={() => setHover(null)}
+      className="relative overflow-x-auto overflow-y-hidden"
     >
-      <div className="flex items-center justify-between border-b border-zinc-800 px-3 py-1.5">
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-400">Timeline</h2>
-        <div className="flex items-center gap-2 text-zinc-400">
-          <button
-            onClick={() =>
-              dispatch({ type: 'SPLIT_AT', time: useEditor.getState().session.playhead })
-            }
-            className="rounded px-1.5 text-xs hover:bg-zinc-800"
-            title="Split clip at playhead (S)"
-          >
-            ✂
-          </button>
-          <span className="mx-1 h-3 w-px bg-zinc-800" />
-          <button
-            onClick={() => dispatch({ type: 'UNDO' })}
-            className="rounded px-1.5 text-xs hover:bg-zinc-800"
-            title="Undo (⌘Z)"
-          >
-            ↺
-          </button>
-          <button
-            onClick={() => dispatch({ type: 'REDO' })}
-            className="rounded px-1.5 text-xs hover:bg-zinc-800"
-            title="Redo (⇧⌘Z)"
-          >
-            ↻
-          </button>
-          <span className="mx-1 h-3 w-px bg-zinc-800" />
-          <button onClick={() => dispatch({ type: 'ZOOM', pxPerSec: pxPerSec / 1.5 })} className="rounded px-1.5 hover:bg-zinc-800">−</button>
-          <span className="w-14 text-center font-mono text-[10px]">{Math.round(pxPerSec)} px/s</span>
-          <button onClick={() => dispatch({ type: 'ZOOM', pxPerSec: pxPerSec * 1.5 })} className="rounded px-1.5 hover:bg-zinc-800">+</button>
-        </div>
-      </div>
-
-      <div ref={scroller} className="relative min-h-0 flex-1 overflow-x-auto overflow-y-hidden">
-        <div className="relative" style={{ width, height: RULER_H + TRACKS.length * (TRACK_H + 8) + 8 }}>
-          {/* ruler — pointer down anywhere on it seeks */}
-          <div
-            onPointerDown={scrub}
-            onPointerMove={(e) => e.buttons === 1 && dispatch({ type: 'SEEK', time: timeAt(e.clientX) })}
-            className="sticky top-0 cursor-col-resize border-b border-zinc-800/80 bg-zinc-900"
-            style={{ height: RULER_H }}
-          >
-            {marks.map((t) => (
-              <span
-                key={t}
-                className="absolute bottom-0 border-l border-zinc-700 pl-1 font-mono text-[9px] leading-4 text-zinc-500"
-                style={{ left: t * pxPerSec, height: 14 }}
-              >
-                {fmt(t)}
-              </span>
-            ))}
-          </div>
-
-          {/* tracks */}
-          {TRACKS.map((trackId, row) => (
-            <div
-              key={trackId}
-              onPointerDown={pan}
-              className="absolute right-0 left-0 cursor-grab rounded-md bg-zinc-950/60 active:cursor-grabbing"
-              style={{ top: RULER_H + 8 + row * (TRACK_H + 8), height: TRACK_H }}
+      <div className="relative" style={{ width, height: RULER_H + TRACKS.length * (TRACK_H + 8) + 8 }}>
+        {/* ruler — pointer down anywhere on it seeks */}
+        <div
+          onPointerDown={scrub}
+          onPointerMove={(e) => e.buttons === 1 && dispatch({ type: 'SEEK', time: timeAt(e.clientX) })}
+          className="sticky top-0 cursor-col-resize"
+          style={{ height: RULER_H }}
+        >
+          {/* scrub line with end caps */}
+          <div className="absolute inset-x-0 top-3 h-px bg-lime-300/60" />
+          <div className="absolute top-[9px] left-0 h-1.5 w-1.5 rounded-full bg-lime-300" />
+          <div className="absolute top-[9px] right-0 h-1.5 w-1.5 rounded-full bg-lime-300" />
+          {marks.map((t) => (
+            <span
+              key={t}
+              className="absolute bottom-0 -translate-x-1/2 font-mono text-[11px] leading-4 text-zinc-300"
+              style={{ left: t * pxPerSec }}
             >
-              <span className="absolute top-1 left-1.5 z-10 font-mono text-[9px] text-zinc-600">
-                {trackId.toUpperCase()}
-              </span>
-              {Object.values(doc.clips)
-                .filter((c) => c.trackId === trackId)
-                .map((c) => {
-                  // render from ghost values while this clip is mid-gesture
-                  const g = drag?.clipId === c.id ? drag : c
-                  const m = media[c.mediaId]
-                  const selected = selection === c.id
-                  return (
+              {label(t)}
+            </span>
+          ))}
+          {/* dotted minor ticks between labels */}
+          {marks.slice(1).flatMap((t) =>
+            [1, 2, 3, 4].map((i) => (
+              <span
+                key={`${t}.${i}`}
+                className="absolute bottom-[7px] h-0.5 w-0.5 rounded-full bg-zinc-500"
+                style={{ left: (t - (labelStep * i) / 5) * pxPerSec }}
+              />
+            )),
+          )}
+        </div>
+
+        {/* tracks */}
+        {TRACKS.map((trackId, row) => (
+          <div
+            key={trackId}
+            onPointerDown={pan}
+            className="absolute right-0 left-0 cursor-grab rounded-2xl bg-white/[0.04] active:cursor-grabbing"
+            style={{ top: RULER_H + 8 + row * (TRACK_H + 8), height: TRACK_H }}
+          >
+            <span className="absolute top-1 left-2 z-10 font-mono text-[9px] text-zinc-500">
+              {trackId.toUpperCase()}
+            </span>
+            {Object.values(doc.clips)
+              .filter((c) => c.trackId === trackId)
+              .map((c) => {
+                // render from ghost values while this clip is mid-gesture
+                const g = drag?.clipId === c.id ? drag : c
+                const m = media[c.mediaId]
+                const selected = selection === c.id
+                return (
+                  <div
+                    key={c.id}
+                    onPointerDown={(e) => startClipDrag(e, c, 'move')}
+                    className={`group absolute top-1 bottom-1 cursor-grab overflow-hidden rounded-[18px] border-2 bg-zinc-800 active:cursor-grabbing ${
+                      selected ? 'border-lime-300 shadow-lg shadow-lime-400/20' : 'border-white/15'
+                    }`}
+                    style={{
+                      left: g.start * pxPerSec,
+                      width: (g.out - g.in) * pxPerSec,
+                      // filmstrip: tile the poster frame across the clip
+                      backgroundImage: m?.thumb ? `url(${m.thumb})` : undefined,
+                      backgroundSize: 'auto 100%',
+                      backgroundRepeat: 'repeat-x',
+                    }}
+                  >
+                    <span className="pointer-events-none absolute inset-x-7 top-1 truncate text-[10px] font-medium text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.9)]">
+                      {m?.name}
+                    </span>
+                    <ClipWave
+                      media={m}
+                      from={m ? g.in / m.duration : 0}
+                      to={m ? g.out / m.duration : 1}
+                      width={(g.out - g.in) * pxPerSec}
+                    />
+                    <span className="pointer-events-none absolute bottom-1 left-7 font-mono text-[9px] text-white/70 [text-shadow:0_1px_2px_rgba(0,0,0,0.9)]">
+                      {fmt(g.out - g.in)}
+                    </span>
                     <div
-                      key={c.id}
-                      onPointerDown={(e) => startClipDrag(e, c, 'move')}
-                      className={`group absolute top-1 bottom-1 cursor-grab overflow-hidden rounded-lg border bg-gradient-to-b from-indigo-500/90 to-indigo-600/90 active:cursor-grabbing ${
-                        selected ? 'border-white/90 shadow-lg shadow-indigo-500/30' : 'border-indigo-400/40'
+                      onPointerDown={(e) => startClipDrag(e, c, 'trim-l')}
+                      className={`absolute inset-y-0 left-0 flex w-6 cursor-ew-resize items-center pl-1 transition group-hover:opacity-100 ${
+                        selected ? 'opacity-100' : 'opacity-0'
                       }`}
-                      style={{ left: g.start * pxPerSec, width: (g.out - g.in) * pxPerSec }}
                     >
-                      <span className="pointer-events-none absolute inset-x-2 top-1.5 truncate text-[10px] font-medium text-white/90">
-                        {m?.name}
-                      </span>
-                      <ClipWave
-                        media={m}
-                        from={m ? g.in / m.duration : 0}
-                        to={m ? g.out / m.duration : 1}
-                        width={(g.out - g.in) * pxPerSec}
-                      />
-                      <span className="pointer-events-none absolute bottom-1 left-2 font-mono text-[9px] text-white/50">
-                        {fmt(g.out - g.in)}
-                      </span>
-                      <div
-                        onPointerDown={(e) => startClipDrag(e, c, 'trim-l')}
-                        className="absolute inset-y-0 left-0 flex w-2.5 cursor-ew-resize items-center justify-center rounded-l-lg bg-black/30 opacity-70 transition group-hover:opacity-100"
-                      >
-                        <div className="h-4 w-0.5 rounded bg-white/80" />
-                      </div>
-                      <div
-                        onPointerDown={(e) => startClipDrag(e, c, 'trim-r')}
-                        className="absolute inset-y-0 right-0 flex w-2.5 cursor-ew-resize items-center justify-center rounded-r-lg bg-black/30 opacity-70 transition group-hover:opacity-100"
-                      >
-                        <div className="h-4 w-0.5 rounded bg-white/80" />
+                      <div className="flex h-8 w-5 items-center justify-center rounded-full bg-lime-300 text-xs font-bold text-zinc-900">
+                        ‹
                       </div>
                     </div>
-                  )
-                })}
-            </div>
-          ))}
-
-          {/* playhead */}
-          <div
-            className="pointer-events-none absolute top-0 bottom-0 z-20 w-px bg-rose-500"
-            style={{ left: playhead * pxPerSec }}
-          >
-            <div className="absolute -top-0 -left-[5px] h-0 w-0 border-x-[5px] border-t-[7px] border-x-transparent border-t-rose-500" />
+                    <div
+                      onPointerDown={(e) => startClipDrag(e, c, 'trim-r')}
+                      className={`absolute inset-y-0 right-0 flex w-6 cursor-ew-resize items-center justify-end pr-1 transition group-hover:opacity-100 ${
+                        selected ? 'opacity-100' : 'opacity-0'
+                      }`}
+                    >
+                      <div className="flex h-8 w-5 items-center justify-center rounded-full bg-lime-300 text-xs font-bold text-zinc-900">
+                        ›
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
           </div>
+        ))}
+
+        {/* hover frame preview */}
+        {hover !== null && (
+          <div
+            className="pointer-events-none absolute z-30 -translate-x-1/2 overflow-hidden rounded-lg border border-white/15 bg-zinc-900/90 shadow-xl backdrop-blur"
+            style={{
+              left: Math.min(Math.max(hover * pxPerSec, THUMB_W / 2 + 4), width - THUMB_W / 2 - 4),
+              top: RULER_H + 4,
+            }}
+          >
+            <HoverThumb time={hover} />
+            <div className="px-2 py-0.5 text-center font-mono text-[10px] text-zinc-300">
+              {fmt(hover)}
+            </div>
+          </div>
+        )}
+
+        {/* playhead */}
+        <div
+          className="pointer-events-none absolute top-0 bottom-0 z-20 w-px bg-lime-300"
+          style={{ left: playhead * pxPerSec }}
+        />
+        {/* handle clamped so it stays visible when the playhead sits at 0 */}
+        <div
+          className="pointer-events-none absolute top-0 z-20 flex h-6 -translate-x-1/2 items-center gap-2 rounded-full bg-lime-300 px-3 text-xs font-bold text-zinc-900 shadow-md shadow-black/40"
+          style={{ left: Math.max(playhead * pxPerSec, 26) }}
+        >
+          <span>‹</span>
+          <span>›</span>
         </div>
       </div>
     </div>

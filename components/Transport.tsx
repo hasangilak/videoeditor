@@ -4,9 +4,13 @@ import { useEditor, dispatch, docDuration } from '@/lib/store'
 import { exportTimeline } from '@/lib/export'
 import { fmt } from '@/lib/format'
 
+const glass =
+  'flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-zinc-200 backdrop-blur transition hover:bg-white/20'
+
 export default function Transport() {
   const playing = useEditor((s) => s.session.playing)
   const playhead = useEditor((s) => s.session.playhead)
+  const pxPerSec = useEditor((s) => s.session.pxPerSec)
   const duration = useEditor((s) => docDuration(s.doc))
   const [exporting, setExporting] = useState(false)
 
@@ -19,19 +23,19 @@ export default function Transport() {
   }
 
   return (
-    <div className="relative flex items-center justify-center gap-4 rounded-xl border border-zinc-800 bg-zinc-900/60 px-4 py-2.5">
+    <div className="relative flex items-center gap-2 px-4 pb-4 pt-3">
       <button
         onClick={() => dispatch({ type: 'SEEK', time: 0 })}
-        className="text-zinc-400 transition hover:text-white"
+        className={glass}
         title="Go to start"
       >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
           <path d="M3 2h2v12H3zM13 2 6 8l7 6z" />
         </svg>
       </button>
       <button
         onClick={() => dispatch({ type: playing ? 'PAUSE' : 'PLAY' })}
-        className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-500 text-white transition hover:bg-indigo-400"
+        className="flex h-11 w-11 items-center justify-center rounded-full bg-lime-300 text-zinc-900 transition hover:bg-lime-200"
         title="Play / pause (space)"
       >
         {playing ? (
@@ -44,17 +48,54 @@ export default function Transport() {
           </svg>
         )}
       </button>
-      <span className="font-mono text-xs tabular-nums text-zinc-400">
-        <span className="text-zinc-100">{fmt(playhead)}</span> / {fmt(duration)}
-      </span>
       <button
-        onClick={onExport}
-        disabled={exporting || playing || duration === 0}
-        className="absolute right-3 rounded-md bg-zinc-800 px-3 py-1 text-xs font-medium text-zinc-200 transition hover:bg-zinc-700 disabled:opacity-40"
-        title="Play the timeline through and save it as .webm"
+        onClick={() => dispatch({ type: 'SPLIT_AT', time: useEditor.getState().session.playhead })}
+        className={glass}
+        title="Split clip at playhead (S)"
       >
-        {exporting ? 'Exporting…' : 'Export'}
+        ✂
       </button>
+
+      {/* center strip: lime pills on dark glass, like the mock's setting chips */}
+      <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-zinc-900/70 p-1.5 backdrop-blur-xl">
+        <span className="rounded-full bg-lime-300 px-4 py-1.5 font-mono text-xs font-semibold tabular-nums text-zinc-900">
+          <span>{fmt(playhead)}</span> / {fmt(duration)}
+        </span>
+        <div className="flex items-center rounded-full bg-lime-300 px-1.5 py-1.5 text-zinc-900">
+          <button
+            onClick={() => dispatch({ type: 'ZOOM', pxPerSec: pxPerSec / 1.5 })}
+            className="rounded-full px-2 font-bold hover:bg-lime-200"
+          >
+            −
+          </button>
+          <span className="w-14 text-center font-mono text-[10px] font-semibold">
+            {Math.round(pxPerSec)} px/s
+          </span>
+          <button
+            onClick={() => dispatch({ type: 'ZOOM', pxPerSec: pxPerSec * 1.5 })}
+            className="rounded-full px-2 font-bold hover:bg-lime-200"
+          >
+            +
+          </button>
+        </div>
+        <button
+          onClick={onExport}
+          disabled={exporting || playing || duration === 0}
+          className="rounded-full bg-lime-300 px-4 py-1.5 text-xs font-semibold text-zinc-900 transition hover:bg-lime-200 disabled:opacity-40"
+          title="Play the timeline through and save it as .webm"
+        >
+          {exporting ? 'Exporting…' : 'Export'}
+        </button>
+      </div>
+
+      <div className="ml-auto flex items-center gap-2">
+        <button onClick={() => dispatch({ type: 'UNDO' })} className={glass} title="Undo (⌘Z)">
+          ↺
+        </button>
+        <button onClick={() => dispatch({ type: 'REDO' })} className={glass} title="Redo (⇧⌘Z)">
+          ↻
+        </button>
+      </div>
     </div>
   )
 }

@@ -49,6 +49,18 @@ describe('media lifecycle', () => {
     expect(state().history.past).toHaveLength(0)
   })
 
+  it('MEDIA_REMOVED drops the media, its clips, and a dangling selection', () => {
+    seedMedia()
+    dispatch({ type: 'CLIP_ADDED', mediaId: 'm1', trackId: 'v1' })
+    dispatch({ type: 'SELECT', clipId: onlyClipId() })
+    dispatch({ type: 'MEDIA_REMOVED', id: 'm1' })
+    expect(state().media.m1).toBeUndefined()
+    expect(state().doc.clips).toEqual({})
+    expect(state().session.selection).toBeNull()
+    dispatch({ type: 'MEDIA_REMOVED', id: 'nope' }) // unknown id is a no-op
+    expect(state().history.past.length).toBeGreaterThan(0) // clip removal is undoable
+  })
+
   it('attaches waveform peaks to existing media only', () => {
     seedMedia()
     const peaks = new Float32Array([0.5, 1])

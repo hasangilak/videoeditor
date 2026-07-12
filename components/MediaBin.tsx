@@ -1,7 +1,7 @@
 'use client'
 import { useRef, useState } from 'react'
 import { useEditor, dispatch, TRACKS } from '@/lib/store'
-import { importFiles } from '@/lib/media'
+import { importFiles, removeMedia } from '@/lib/media'
 import { fmt } from '@/lib/format'
 
 export default function MediaBin() {
@@ -11,12 +11,12 @@ export default function MediaBin() {
   const items = Object.values(media)
 
   return (
-    <aside className="flex w-72 shrink-0 flex-col gap-3 rounded-xl border border-zinc-800 bg-zinc-900/60 p-3">
+    <aside className="absolute top-4 right-4 bottom-[320px] z-20 flex w-80 flex-col gap-3 rounded-3xl border border-white/10 bg-zinc-900/70 p-3 shadow-2xl shadow-black/40 backdrop-blur-xl">
       <div className="flex items-center justify-between">
         <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-400">Media</h2>
         <button
           onClick={() => input.current?.click()}
-          className="rounded-md bg-indigo-500 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-indigo-400"
+          className="rounded-full bg-lime-300 px-3 py-1 text-xs font-semibold text-zinc-900 transition hover:bg-lime-200"
         >
           Import
         </button>
@@ -38,8 +38,8 @@ export default function MediaBin() {
           setOver(false)
           importFiles(e.dataTransfer.files)
         }}
-        className={`flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto rounded-lg border border-dashed p-2 transition ${
-          over ? 'border-indigo-400 bg-indigo-500/10' : 'border-zinc-800'
+        className={`flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto rounded-xl border border-dashed p-2 transition ${
+          over ? 'border-lime-300 bg-lime-300/10' : 'border-white/10'
         }`}
       >
         {items.length === 0 && (
@@ -50,13 +50,13 @@ export default function MediaBin() {
           </p>
         )}
         {items.map((m) => (
-          <div key={m.id} className="group rounded-lg border border-zinc-800 bg-zinc-900 p-2.5">
+          <div key={m.id} className="group rounded-xl border border-white/10 bg-zinc-900/60 p-2.5">
             <div className="flex items-center gap-2.5">
               {m.thumb ? (
                 // eslint-disable-next-line @next/next/no-img-element -- local data URL
-                <img src={m.thumb} alt="" className="h-9 w-16 shrink-0 rounded object-cover" />
+                <img src={m.thumb} alt="" className="h-9 w-16 shrink-0 rounded-md object-cover" />
               ) : (
-                <div className="h-9 w-16 shrink-0 rounded bg-zinc-800" />
+                <div className="h-9 w-16 shrink-0 rounded-md bg-zinc-800" />
               )}
               <div className="min-w-0 flex-1">
                 <span className="block truncate text-xs font-medium text-zinc-200">{m.name}</span>
@@ -66,6 +66,13 @@ export default function MediaBin() {
                   {m.status === 'error' && <span className="text-rose-400">cannot decode</span>}
                 </span>
               </div>
+              <button
+                onClick={() => removeMedia(m.id)}
+                title="Remove import (also removes its clips)"
+                className="shrink-0 self-start rounded-full px-1.5 text-sm leading-5 text-zinc-500 opacity-0 transition group-hover:opacity-100 hover:bg-rose-500/20 hover:text-rose-400"
+              >
+                ×
+              </button>
             </div>
             <div className="mt-2 h-1 overflow-hidden rounded-full bg-zinc-800">
               <div
@@ -73,10 +80,10 @@ export default function MediaBin() {
                   m.upload.state === 'error'
                     ? 'bg-rose-500'
                     : m.upload.state === 'done'
-                      ? 'bg-emerald-500'
+                      ? 'bg-lime-400'
                       : m.upload.state === 'paused'
                         ? 'bg-amber-500'
-                        : 'bg-indigo-500'
+                        : 'bg-lime-300'
                 }`}
                 style={{ width: `${m.upload.state === 'done' ? 100 : m.upload.pct}%` }}
               />
@@ -94,7 +101,7 @@ export default function MediaBin() {
                     key={t}
                     disabled={m.status !== 'ready'}
                     onClick={() => dispatch({ type: 'CLIP_ADDED', mediaId: m.id, trackId: t })}
-                    className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-zinc-300 hover:bg-indigo-500 hover:text-white disabled:opacity-40"
+                    className="rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] font-medium text-zinc-300 hover:bg-lime-300 hover:text-zinc-900 disabled:opacity-40"
                   >
                     + {t.toUpperCase()}
                   </button>

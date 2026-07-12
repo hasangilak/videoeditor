@@ -25,6 +25,11 @@ export async function saveFile(id: string, file: File) {
   db.transaction(FILES, 'readwrite').objectStore(FILES).put(file, id)
 }
 
+export async function deleteFile(id: string) {
+  const db = await idb()
+  db.transaction(FILES, 'readwrite').objectStore(FILES).delete(id)
+}
+
 function loadFile(db: IDBDatabase, id: string): Promise<File | undefined> {
   return new Promise((res) => {
     const req = db.transaction(FILES).objectStore(FILES).get(id)

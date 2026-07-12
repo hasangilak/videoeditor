@@ -55,6 +55,7 @@ export type Action =
   | { type: 'MEDIA_ADDED'; media: Media }
   | { type: 'MEDIA_READY'; id: string; duration: number }
   | { type: 'MEDIA_ERROR'; id: string }
+  | { type: 'MEDIA_REMOVED'; id: string } // drops the media and every clip that uses it
   | { type: 'THUMB_READY'; id: string; thumb: string }
   | { type: 'WAVEFORM_READY'; id: string; peaks: Float32Array }
   | { type: 'RESTORED'; doc: Doc; media: Record<string, Media> }
@@ -123,6 +124,28 @@ function reduce(s: State, a: Action): State {
       const m = s.media[a.id]
       if (!m) return s
       return { ...s, media: { ...s.media, [a.id]: { ...m, status: 'error' } } }
+    }
+
+    case 'MEDIA_REMOVED': {
+      if (!s.media[a.id]) return s
+      const media = { ...s.media }
+      delete media[a.id]
+      const entries = Object.entries(s.doc.clips).filter(([, c]) => c.mediaId !== a.id)
+      // only clip deletion is an undo step; media itself is gone for good
+      const next =
+        entries.length === Object.keys(s.doc.clips).length
+          ? { ...s, media }
+          : { ...commit(s, { clips: Object.fromEntries(entries) }), media }
+      return {
+        ...next,
+        session: {
+          ...next.session,
+          selection:
+            next.session.selection && next.doc.clips[next.session.selection]
+              ? next.session.selection
+              : null,
+        },
+      }
     }
 
     case 'THUMB_READY': {

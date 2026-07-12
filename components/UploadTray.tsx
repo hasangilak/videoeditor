@@ -23,7 +23,7 @@ export default function UploadTray() {
   if (active.length === 0) return null
 
   return (
-    <div className="fixed right-4 bottom-4 z-50 w-72 rounded-xl border border-zinc-700 bg-zinc-900 p-3 shadow-2xl shadow-black/60">
+    <div className="fixed bottom-24 left-4 z-50 w-72 rounded-2xl border border-white/10 bg-zinc-900/80 p-3 shadow-2xl shadow-black/60 backdrop-blur-xl">
       <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-400">
         Uploads
       </h3>
@@ -48,7 +48,7 @@ export default function UploadTray() {
                     ? 'bg-rose-500'
                     : m.upload.state === 'paused'
                       ? 'bg-amber-500'
-                      : 'bg-indigo-500'
+                      : 'bg-lime-300'
                 }`}
                 style={{ width: `${m.upload.pct}%` }}
               />

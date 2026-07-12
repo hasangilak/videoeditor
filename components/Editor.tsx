@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useEditor, dispatch } from '@/lib/store'
 import { restore, startAutosave } from '@/lib/persist'
 import MediaBin from './MediaBin'
@@ -46,6 +47,9 @@ function useKeyboard() {
   }, [])
 }
 
+const rail =
+  'flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-zinc-900/60 text-zinc-300 backdrop-blur-xl transition hover:text-white'
+
 export default function Editor() {
   usePlaybackEngine()
   useKeyboard()
@@ -54,42 +58,48 @@ export default function Editor() {
     return startAutosave()
   }, [])
 
-  // splitter between preview and timeline: drag up/down to trade space
-  const [timelineH, setTimelineH] = useState(224)
-  const startResize = (e: React.PointerEvent) => {
-    const y0 = e.clientY
-    const h0 = timelineH
-    const move = (ev: PointerEvent) => {
-      const max = window.innerHeight - 260 // keep the preview usable
-      setTimelineH(Math.min(max, Math.max(120, h0 - (ev.clientY - y0))))
-    }
-    const up = () => {
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', up)
-    }
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', up)
-  }
+  const [bin, setBin] = useState(true)
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col p-3">
-      <div className="flex min-h-0 flex-1 gap-3">
-        <MediaBin />
-        <main className="flex min-w-0 flex-1 flex-col gap-3">
-          <Preview />
-          <Transport />
-        </main>
+    <div className="relative min-h-0 flex-1 overflow-hidden bg-black">
+      <Preview />
+
+      {/* left rail */}
+      <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
+        <button
+          onClick={() => setBin((b) => !b)}
+          title="Media"
+          className={bin ? `${rail} !bg-lime-300 !text-zinc-900` : rail}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="3" y="5" width="18" height="14" rx="3" />
+            <path d="M3 9h18M8 5v14M16 5v14" />
+          </svg>
+        </button>
+        <Link href="/library" title="Library" className={rail}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="3" y="3" width="8" height="8" rx="2" />
+            <rect x="13" y="3" width="8" height="8" rx="2" />
+            <rect x="3" y="13" width="8" height="8" rx="2" />
+            <rect x="13" y="13" width="8" height="8" rx="2" />
+          </svg>
+        </Link>
       </div>
 
-      <div
-        onPointerDown={startResize}
-        className="group flex h-3 shrink-0 cursor-row-resize items-center justify-center"
-        title="Drag to resize"
-      >
-        <div className="h-1 w-24 rounded-full bg-zinc-800 transition group-hover:bg-indigo-500 group-active:bg-indigo-400" />
+      {/* project title */}
+      <div className="absolute top-4 left-1/2 z-20 -translate-x-1/2 rounded-full border border-white/10 bg-zinc-900/60 px-5 py-2 text-sm font-semibold tracking-tight text-zinc-100 backdrop-blur-xl">
+        reel
       </div>
 
-      <Timeline height={timelineH} />
+      {bin && <MediaBin />}
+
+      {/* bottom overlay: timeline + transport float over the preview */}
+      <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black via-black/70 to-transparent pt-12">
+        <div className="px-4">
+          <Timeline />
+        </div>
+        <Transport />
+      </div>
     </div>
   )
 }
