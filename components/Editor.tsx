@@ -37,6 +37,14 @@ function useKeyboard() {
         dispatch({ type: 'CLIP_REMOVED', clipId: s.selection })
       } else if (e.key.toLowerCase() === 's' && !e.metaKey && !e.ctrlKey) {
         dispatch({ type: 'SPLIT_AT', time: s.playhead })
+      } else if (e.key.toLowerCase() === 'i' && !e.metaKey && !e.ctrlKey) {
+        dispatch({ type: 'MARK_IN', time: s.playhead })
+      } else if (e.key.toLowerCase() === 'o' && !e.metaKey && !e.ctrlKey) {
+        dispatch({ type: 'MARK_OUT', time: s.playhead })
+      } else if (e.key.toLowerCase() === 'x' && !e.metaKey && !e.ctrlKey) {
+        dispatch({ type: 'CUT_RANGE' })
+      } else if (e.key === 'Escape') {
+        dispatch({ type: 'MARKS_CLEARED' })
       } else if (e.key === 'z' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault()
         dispatch({ type: e.shiftKey ? 'REDO' : 'UNDO' })

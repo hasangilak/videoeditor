@@ -85,6 +85,53 @@ test('split at the playhead, then undo and redo', async ({ page }) => {
   await expect(clips(page)).toHaveCount(2)
 })
 
+test('mark in/out then cut removes the middle and closes the gap', async ({ page }) => {
+  await importVideo(page)
+  await addClip(page)
+  const whole = (await clips(page).first().boundingBox())!
+
+  await seekTo(page, 1)
+  await page.keyboard.press('i')
+  await seekTo(page, 2)
+  await page.keyboard.press('o')
+  await expect(page.getByTestId('cut-range')).toBeVisible()
+  const range = (await page.getByTestId('cut-range').boundingBox())!
+  expect(range.width).toBeCloseTo(60, -1) // 1 s at 60 px/s
+
+  await page.getByRole('button', { name: '✂ Cut' }).click()
+  await expect(clips(page)).toHaveCount(2)
+  await expect(page.getByTestId('cut-range')).toBeHidden()
+
+  // the remaining halves cover the original span minus the cut second
+  const boxes = await Promise.all([clips(page).nth(0).boundingBox(), clips(page).nth(1).boundingBox()])
+  expect(boxes[0]!.width + boxes[1]!.width).toBeCloseTo(whole.width - 60, -1)
+  expect(await playheadSeconds(page)).toBeCloseTo(1, 0)
+
+  await page.getByTitle('Undo (⌘Z)').click()
+  await expect(clips(page)).toHaveCount(1)
+})
+
+test('marks deactivate via a click on the flag or the transport toggle', async ({ page }) => {
+  await importVideo(page)
+  await addClip(page)
+  await seekTo(page, 1)
+  await page.keyboard.press('i')
+  await seekTo(page, 2.5)
+  await page.keyboard.press('o')
+  await expect(page.getByTestId('cut-range')).toBeVisible()
+
+  // clicking the I flag (no drag) removes just that mark
+  await page.getByTestId('mark-i').click()
+  await expect(page.getByTestId('mark-i')).toBeHidden()
+  await expect(page.getByTestId('cut-range')).toBeHidden()
+  await expect(page.getByTestId('mark-o')).toBeVisible()
+
+  // the lit O button in the transport toggles its mark off
+  await page.getByTitle('Clear cut end').click()
+  await expect(page.getByTestId('mark-o')).toBeHidden()
+  await expect(page.getByTitle('Mark cut end at playhead (O)')).toBeVisible()
+})
+
 test('dragging a clip moves it along the track', async ({ page }) => {
   await importVideo(page)
   await addClip(page)

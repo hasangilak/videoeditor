@@ -142,6 +142,116 @@ describe('split', () => {
   })
 })
 
+describe('cut range', () => {
+  beforeEach(() => {
+    seedMedia()
+    dispatch({ type: 'CLIP_ADDED', mediaId: 'm1', trackId: 'v1' }) // 0..10
+  })
+
+  const mark = (a: number, b: number) => {
+    dispatch({ type: 'MARK_IN', time: a })
+    dispatch({ type: 'MARK_OUT', time: b })
+  }
+
+  it('cuts a middle section out of one clip and joins the ends, one undo step', () => {
+    mark(4, 7)
+    const before = state().history.past.length
+    dispatch({ type: 'CUT_RANGE' })
+
+    const clips = Object.values(state().doc.clips).sort((a, b) => a.start - b.start)
+    expect(clips).toHaveLength(2)
+    expect(clips[0]).toMatchObject({ start: 0, in: 0, out: 4 })
+    expect(clips[1]).toMatchObject({ start: 4, in: 7, out: 10 })
+    expect(docDuration(state().doc)).toBe(7)
+    expect(state().history.past).toHaveLength(before + 1)
+
+    dispatch({ type: 'UNDO' })
+    expect(Object.values(state().doc.clips)).toHaveLength(1)
+  })
+
+  it('clears marks, reseats the playhead, and drops a swallowed selection', () => {
+    dispatch({ type: 'SPLIT_AT', time: 4 })
+    dispatch({ type: 'SPLIT_AT', time: 7 })
+    const middle = Object.values(state().doc.clips).find((c) => c.start === 4)!
+    dispatch({ type: 'SELECT', clipId: middle.id })
+    dispatch({ type: 'SEEK', time: 9 })
+    mark(4, 7)
+    dispatch({ type: 'CUT_RANGE' })
+
+    const clips = Object.values(state().doc.clips).sort((a, b) => a.start - b.start)
+    expect(clips).toHaveLength(2) // middle segment swallowed, tail rippled left
+    expect(clips[1]).toMatchObject({ start: 4, in: 7, out: 10 })
+    expect(state().session).toMatchObject({
+      markIn: null,
+      markOut: null,
+      playhead: 4,
+      selection: null,
+    })
+  })
+
+  it('trims clips that only overlap one edge of the range', () => {
+    dispatch({ type: 'CLIP_ADDED', mediaId: 'm1', trackId: 'v2' }) // 0..10
+    dispatch({
+      type: 'DRAG_MOVED',
+      drag: {
+        clipId: Object.values(state().doc.clips).find((c) => c.trackId === 'v2')!.id,
+        mode: 'move',
+        start: 9,
+        in: 0,
+        out: 10,
+      },
+    })
+    dispatch({ type: 'DRAG_COMMITTED' }) // v2 clip now 9..19
+    mark(8, 12)
+    dispatch({ type: 'CUT_RANGE' })
+
+    const v1 = Object.values(state().doc.clips).filter((c) => c.trackId === 'v1')
+    const v2 = Object.values(state().doc.clips).filter((c) => c.trackId === 'v2')
+    expect(v1).toHaveLength(1)
+    expect(v1[0]).toMatchObject({ start: 0, in: 0, out: 8 }) // tail inside the range trimmed off
+    expect(v2).toHaveLength(1)
+    expect(v2[0]).toMatchObject({ start: 8, in: 3, out: 10 }) // head trimmed, pulled up to the seam
+  })
+
+  it('splits a clip that straddles the whole range and closes the gap', () => {
+    dispatch({ type: 'CLIP_ADDED', mediaId: 'm1', trackId: 'v2' }) // 0..10
+    mark(3, 6)
+    dispatch({ type: 'CUT_RANGE' })
+
+    for (const track of ['v1', 'v2'] as const) {
+      const clips = Object.values(state().doc.clips)
+        .filter((c) => c.trackId === track)
+        .sort((a, b) => a.start - b.start)
+      expect(clips).toHaveLength(2)
+      expect(clips[0]).toMatchObject({ start: 0, in: 0, out: 3 })
+      expect(clips[1]).toMatchObject({ start: 3, in: 6, out: 10 })
+    }
+  })
+
+  it('clears one mark without touching the other', () => {
+    mark(2, 5)
+    dispatch({ type: 'MARK_CLEARED', which: 'in' })
+    expect(state().session).toMatchObject({ markIn: null, markOut: 5 })
+    dispatch({ type: 'MARK_CLEARED', which: 'out' })
+    expect(state().session).toMatchObject({ markIn: null, markOut: null })
+    dispatch({ type: 'CUT_RANGE' }) // cleared marks mean nothing to cut
+    expect(Object.values(state().doc.clips)).toHaveLength(1)
+  })
+
+  it('accepts reversed marks and refuses slivers or missing marks', () => {
+    dispatch({ type: 'CUT_RANGE' }) // no marks
+    dispatch({ type: 'MARK_IN', time: 4 })
+    dispatch({ type: 'CUT_RANGE' }) // no out mark
+    mark(4, 4.05)
+    dispatch({ type: 'CUT_RANGE' }) // sliver
+    expect(Object.values(state().doc.clips)).toHaveLength(1)
+
+    mark(7, 4) // out before in still cuts 4..7
+    dispatch({ type: 'CUT_RANGE' })
+    expect(docDuration(state().doc)).toBe(7)
+  })
+})
+
 describe('drag gesture', () => {
   let id: string
   beforeEach(() => {

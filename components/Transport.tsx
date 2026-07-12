@@ -11,6 +11,8 @@ export default function Transport() {
   const playing = useEditor((s) => s.session.playing)
   const playhead = useEditor((s) => s.session.playhead)
   const pxPerSec = useEditor((s) => s.session.pxPerSec)
+  const markIn = useEditor((s) => s.session.markIn)
+  const markOut = useEditor((s) => s.session.markOut)
   const duration = useEditor((s) => docDuration(s.doc))
   const [exporting, setExporting] = useState(false)
 
@@ -54,6 +56,43 @@ export default function Transport() {
         title="Split clip at playhead (S)"
       >
         ✂
+      </button>
+      <button
+        onClick={() =>
+          dispatch(
+            markIn !== null
+              ? { type: 'MARK_CLEARED', which: 'in' }
+              : { type: 'MARK_IN', time: useEditor.getState().session.playhead },
+          )
+        }
+        className={`${glass} font-mono text-xs font-bold ${markIn !== null ? '!bg-rose-400/80 !text-zinc-900' : ''}`}
+        title={markIn !== null ? 'Clear cut start' : 'Mark cut start at playhead (I)'}
+      >
+        I
+      </button>
+      <button
+        onClick={() =>
+          dispatch(
+            markOut !== null
+              ? { type: 'MARK_CLEARED', which: 'out' }
+              : { type: 'MARK_OUT', time: useEditor.getState().session.playhead },
+          )
+        }
+        className={`${glass} font-mono text-xs font-bold ${markOut !== null ? '!bg-rose-400/80 !text-zinc-900' : ''}`}
+        title={markOut !== null ? 'Clear cut end' : 'Mark cut end at playhead (O)'}
+      >
+        O
+      </button>
+      <button
+        onClick={() => dispatch({ type: 'CUT_RANGE' })}
+        disabled={markIn === null || markOut === null || Math.abs(markOut - markIn) < 0.1}
+        className={`${glass} disabled:opacity-40`}
+        title="Cut out the marked range (X) — Esc clears marks"
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M2 2v12M14 2v12" />
+          <path d="M5 5l6 6M11 5l-6 6" strokeLinecap="round" />
+        </svg>
       </button>
 
       {/* center strip: lime pills on dark glass, like the mock's setting chips.

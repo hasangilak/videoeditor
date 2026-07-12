@@ -4,7 +4,15 @@ export function resetStore() {
   useEditor.setState({
     doc: { clips: {} },
     history: { past: [], future: [] },
-    session: { playhead: 0, playing: false, selection: null, pxPerSec: 60, drag: null },
+    session: {
+      playhead: 0,
+      playing: false,
+      selection: null,
+      pxPerSec: 60,
+      drag: null,
+      markIn: null,
+      markOut: null,
+    },
     media: {},
   })
 }

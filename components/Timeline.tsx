@@ -96,7 +96,7 @@ function HoverThumb({ time }: { time: number }) {
 
 export default function Timeline() {
   const doc = useEditor((s) => s.doc)
-  const { playhead, pxPerSec, selection, drag } = useEditor((s) => s.session)
+  const { playhead, pxPerSec, selection, drag, markIn, markOut } = useEditor((s) => s.session)
   const media = useEditor((s) => s.media)
   const scroller = useRef<HTMLDivElement>(null)
   const [hover, setHover] = useState<number | null>(null) // hovered time (s)
@@ -162,6 +162,26 @@ export default function Timeline() {
     const up = () => {
       // 200 pointermoves = 1 doc mutation = 1 undo step
       dispatch({ type: 'DRAG_COMMITTED' })
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
+
+  // drag a mark flag to move it; a plain click removes the mark
+  const dragMark = (e: React.PointerEvent, type: 'MARK_IN' | 'MARK_OUT') => {
+    e.stopPropagation()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    const x0 = e.clientX
+    let moved = false
+    const move = (ev: PointerEvent) => {
+      if (Math.abs(ev.clientX - x0) > 3) moved = true
+      if (moved) dispatch({ type, time: timeAt(ev.clientX) })
+    }
+    const up = () => {
+      if (!moved)
+        dispatch({ type: 'MARK_CLEARED', which: type === 'MARK_IN' ? 'in' : 'out' })
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
     }
@@ -313,6 +333,56 @@ export default function Timeline() {
               {fmt(hover)}
             </div>
           </div>
+        )}
+
+        {/* cut-range markers — the shaded span between them is what CUT_RANGE removes */}
+        {markIn !== null && markOut !== null && (
+          <>
+            <div
+              data-testid="cut-range"
+              className="pointer-events-none absolute top-3 bottom-0 z-10 border-x border-rose-400/60 bg-rose-400/10"
+              style={{
+                left: Math.min(markIn, markOut) * pxPerSec,
+                width: Math.abs(markOut - markIn) * pxPerSec,
+              }}
+            />
+            {Math.abs(markOut - markIn) >= 0.1 && (
+              <button
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => dispatch({ type: 'CUT_RANGE' })}
+                title="Cut out the marked range (X)"
+                className="absolute top-[13px] z-30 flex h-6 -translate-x-1/2 cursor-pointer items-center gap-1 rounded-full bg-rose-400 px-3 text-[11px] font-bold whitespace-nowrap text-zinc-900 shadow-md shadow-black/40 transition hover:bg-rose-300"
+                style={{ left: ((markIn + markOut) / 2) * pxPerSec }}
+              >
+                ✂ Cut
+              </button>
+            )}
+          </>
+        )}
+        {([['MARK_IN', markIn, 'I'], ['MARK_OUT', markOut, 'O']] as const).map(
+          ([type, t, label]) =>
+            t !== null && (
+              // z-30: the flag must stay visible when it lands under the playhead pill
+              <div key={type} className="absolute top-3 bottom-0 z-30" style={{ left: t * pxPerSec }}>
+                <div className="pointer-events-none absolute inset-y-0 w-px bg-rose-400" />
+                <div
+                  data-testid={`mark-${label.toLowerCase()}`}
+                  title="Drag to move — click to remove"
+                  onPointerDown={(e) => dragMark(e, type)}
+                  className={`absolute -top-1 flex h-5 w-5 cursor-ew-resize items-center justify-center rounded-full bg-rose-400 font-mono text-[10px] font-bold text-zinc-900 shadow-md shadow-black/40 transition hover:scale-125 ${
+                    type === 'MARK_IN' ? '-translate-x-full rounded-r-none' : 'rounded-l-none'
+                  }`}
+                >
+                  {/* keyed by time so the ping replays wherever the mark lands */}
+                  <span
+                    key={t}
+                    className="pointer-events-none absolute inset-0 animate-ping rounded-[inherit] bg-rose-400"
+                    style={{ animationIterationCount: 3 }}
+                  />
+                  <span className="relative">{label}</span>
+                </div>
+              </div>
+            ),
         )}
 
         {/* playhead — hangs from the scrub line rather than crossing it */}

@@ -47,6 +47,8 @@ export interface State {
     selection: string | null
     pxPerSec: number
     drag: Drag | null
+    markIn: number | null // range markers for cutting out a middle section
+    markOut: number | null
   }
   media: Record<string, Media>
 }
@@ -64,6 +66,11 @@ export type Action =
   | { type: 'CLIP_ADDED'; mediaId: string; trackId: TrackId }
   | { type: 'CLIP_REMOVED'; clipId: string }
   | { type: 'SPLIT_AT'; time: number } // razor: selected clip if under the cut, else all clips there
+  | { type: 'MARK_IN'; time: number } // range markers live in session — never undo steps
+  | { type: 'MARK_OUT'; time: number }
+  | { type: 'MARK_CLEARED'; which: 'in' | 'out' }
+  | { type: 'MARKS_CLEARED' }
+  | { type: 'CUT_RANGE' } // ripple-delete the marked range: trim/drop what's inside, shift what follows
   | { type: 'DRAG_MOVED'; drag: Drag } // ephemeral: writes session only, 1 undo step per gesture
   | { type: 'DRAG_COMMITTED' }
   | { type: 'DRAG_CANCELLED' }
@@ -221,6 +228,60 @@ function reduce(s: State, a: Action): State {
       return commit(s, { clips })
     }
 
+    case 'MARK_IN':
+      return { ...s, session: { ...s.session, markIn: Math.max(0, a.time) } }
+
+    case 'MARK_OUT':
+      return { ...s, session: { ...s.session, markOut: Math.max(0, a.time) } }
+
+    case 'MARK_CLEARED':
+      return {
+        ...s,
+        session:
+          a.which === 'in' ? { ...s.session, markIn: null } : { ...s.session, markOut: null },
+      }
+
+    case 'MARKS_CLEARED':
+      return { ...s, session: { ...s.session, markIn: null, markOut: null } }
+
+    case 'CUT_RANGE': {
+      const { markIn, markOut } = s.session
+      if (markIn === null || markOut === null) return s
+      const lo = Math.min(markIn, markOut)
+      const hi = Math.max(markIn, markOut)
+      // same sliver guard as SPLIT_AT — a cut this narrow only leaves debris
+      if (hi - lo < 0.1) return s
+      const len = hi - lo
+      const clips: Record<string, Clip> = {}
+      for (const c of Object.values(s.doc.clips)) {
+        const end = clipEnd(c)
+        if (end <= lo + 0.05) clips[c.id] = c
+        else if (c.start >= hi - 0.05) clips[c.id] = { ...c, start: c.start - len }
+        else if (c.start >= lo - 0.05 && end <= hi + 0.05) continue // swallowed by the range
+        else if (c.start < lo && end > hi) {
+          // straddles the whole range: keep the head, spawn the tail at the seam
+          clips[c.id] = { ...c, out: c.in + (lo - c.start) }
+          const id = crypto.randomUUID()
+          clips[id] = { ...c, id, start: lo, in: c.in + (hi - c.start) }
+        } else if (c.start < lo) clips[c.id] = { ...c, out: c.in + (lo - c.start) }
+        else clips[c.id] = { ...c, start: lo, in: c.in + (hi - c.start) }
+      }
+      const next = commit(s, { clips })
+      return {
+        ...next,
+        session: {
+          ...next.session,
+          markIn: null,
+          markOut: null,
+          playhead: clamp(lo, 0, docDuration(next.doc)),
+          selection:
+            next.session.selection && clips[next.session.selection]
+              ? next.session.selection
+              : null,
+        },
+      }
+    }
+
     case 'DRAG_MOVED':
       return { ...s, session: { ...s.session, drag: a.drag } }
 
@@ -258,7 +319,8 @@ function reduce(s: State, a: Action): State {
       const end = docDuration(s.doc)
       if (a.time >= end)
         return { ...s, session: { ...s.session, playhead: end, playing: false } }
-      return { ...s, session: { ...s.session, playhead: a.time } }
+      // the first rAF timestamp can predate the engine's t0 — never tick below 0
+      return { ...s, session: { ...s.session, playhead: Math.max(0, a.time) } }
     }
 
     case 'SELECT':
@@ -290,7 +352,15 @@ function reduce(s: State, a: Action): State {
 const initial: State = {
   doc: { clips: {} },
   history: { past: [], future: [] },
-  session: { playhead: 0, playing: false, selection: null, pxPerSec: 60, drag: null },
+  session: {
+    playhead: 0,
+    playing: false,
+    selection: null,
+    pxPerSec: 60,
+    drag: null,
+    markIn: null,
+    markOut: null,
+  },
   media: {},
 }
 
