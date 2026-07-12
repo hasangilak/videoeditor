@@ -30,15 +30,22 @@ function ClipWave({
     // hit on very long clips at high zoom) — tile canvases if it ever matters
     c.width = Math.max(1, Math.min(8192, Math.round(width * dpr)))
     c.height = Math.round(WAVE_H * dpr)
-    drawWaveform(c, peaks, { color: 'rgba(255,255,255,0.55)', from, to })
+    drawWaveform(c, peaks, { color: 'rgba(255,255,255,0.8)', from, to })
   }, [peaks, from, to, width])
   if (!peaks) return null
   return (
-    <canvas
-      ref={ref}
-      className="pointer-events-none absolute inset-x-0 bottom-0 w-full"
-      style={{ height: WAVE_H }}
-    />
+    <>
+      {/* scrim keeps the wave legible over bright filmstrip frames */}
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/50 to-transparent"
+        style={{ height: WAVE_H + 8 }}
+      />
+      <canvas
+        ref={ref}
+        className="pointer-events-none absolute inset-x-0 bottom-0 w-full"
+        style={{ height: WAVE_H }}
+      />
+    </>
   )
 }
 
