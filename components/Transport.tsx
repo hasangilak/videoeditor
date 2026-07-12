@@ -58,7 +58,10 @@ export default function Transport() {
 
       {/* center strip: lime pills on dark glass, like the mock's setting chips */}
       <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-zinc-900/70 p-1.5 backdrop-blur-xl">
-        <span className="rounded-full bg-lime-300 px-4 py-1.5 font-mono text-xs font-semibold tabular-nums text-zinc-900">
+        <span
+          data-testid="timecode"
+          className="rounded-full bg-lime-300 px-4 py-1.5 font-mono text-xs font-semibold tabular-nums text-zinc-900"
+        >
           <span>{fmt(playhead)}</span> / {fmt(duration)}
         </span>
         <div className="flex items-center rounded-full bg-lime-300 px-1.5 py-1.5 text-zinc-900">

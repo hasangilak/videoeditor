@@ -227,6 +227,7 @@ export default function Timeline() {
                 return (
                   <div
                     key={c.id}
+                    data-clip={c.id}
                     onPointerDown={(e) => startClipDrag(e, c, 'move')}
                     className={`group absolute top-1 bottom-1 cursor-grab overflow-hidden rounded-[18px] border-2 bg-zinc-800 active:cursor-grabbing ${
                       selected ? 'border-lime-300 shadow-lg shadow-lime-400/20' : 'border-white/15'
@@ -281,6 +282,7 @@ export default function Timeline() {
         {/* hover frame preview */}
         {hover !== null && (
           <div
+            data-testid="hover-thumb"
             className="pointer-events-none absolute z-30 -translate-x-1/2 overflow-hidden rounded-lg border border-white/15 bg-zinc-900/90 shadow-xl backdrop-blur"
             style={{
               left: Math.min(Math.max(hover * pxPerSec, THUMB_W / 2 + 4), width - THUMB_W / 2 - 4),

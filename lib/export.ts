@@ -22,6 +22,13 @@ export function exportTimeline(canvas: HTMLCanvasElement): Promise<void> {
       resolve()
     }
 
+    dispatch({ type: 'SEEK', time: 0 })
+    dispatch({ type: 'PLAY' })
+    rec.start()
+
+    // subscribe only after PLAY — SEEK notifies with playing still false, and
+    // subscribing earlier made that first notification stop a recording that
+    // hadn't started, so the recorder then ran forever
     const unsub = useEditor.subscribe((state) => {
       if (!state.session.playing) {
         // playback hit the end of the doc (TICK auto-pauses) or user stopped
@@ -29,9 +36,5 @@ export function exportTimeline(canvas: HTMLCanvasElement): Promise<void> {
         rec.stop()
       }
     })
-
-    dispatch({ type: 'SEEK', time: 0 })
-    dispatch({ type: 'PLAY' })
-    rec.start()
   })
 }
