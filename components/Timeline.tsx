@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import { useEditor, dispatch, docDuration, activeClip, TRACKS, type Clip, type Drag, type Media } from '@/lib/store'
+import { useEditor, dispatch, docDuration, activeClip, timelineHover, TRACKS, type Clip, type Drag, type Media } from '@/lib/store'
 import { fmt } from '@/lib/format'
 import { drawWaveform } from '@/lib/waveform'
 
@@ -196,6 +196,8 @@ export default function Timeline() {
   return (
     <div
       ref={scroller}
+      onPointerMove={(e) => (timelineHover.time = timeAt(e.clientX))}
+      onPointerLeave={() => (timelineHover.time = null)}
       className="relative overflow-x-auto overflow-y-hidden"
     >
       <div className="relative" style={{ width, height: RULER_H + TRACKS.length * (TRACK_H + 8) + 8 }}>
@@ -350,11 +352,11 @@ export default function Timeline() {
               <button
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => dispatch({ type: 'CUT_RANGE' })}
-                title="Cut out the marked range (X)"
+                title="Remove the marked range and close the gap (X)"
                 className="absolute top-[13px] z-30 flex h-6 -translate-x-1/2 cursor-pointer items-center gap-1 rounded-full bg-rose-400 px-3 text-[11px] font-bold whitespace-nowrap text-zinc-900 shadow-md shadow-black/40 transition hover:bg-rose-300"
                 style={{ left: ((markIn + markOut) / 2) * pxPerSec }}
               >
-                ✂ Cut
+                ✂ Remove
               </button>
             )}
           </>

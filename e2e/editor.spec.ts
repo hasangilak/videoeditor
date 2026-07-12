@@ -98,7 +98,7 @@ test('mark in/out then cut removes the middle and closes the gap', async ({ page
   const range = (await page.getByTestId('cut-range').boundingBox())!
   expect(range.width).toBeCloseTo(60, -1) // 1 s at 60 px/s
 
-  await page.getByRole('button', { name: '✂ Cut' }).click()
+  await page.getByRole('button', { name: '✂ Remove' }).click()
   await expect(clips(page)).toHaveCount(2)
   await expect(page.getByTestId('cut-range')).toBeHidden()
 
@@ -109,6 +109,27 @@ test('mark in/out then cut removes the middle and closes the gap', async ({ page
 
   await page.getByTitle('Undo (⌘Z)').click()
   await expect(clips(page)).toHaveCount(1)
+})
+
+test('pressing I marks at the hovered time, not the playhead', async ({ page }) => {
+  await importVideo(page)
+  await addClip(page)
+  // playhead stays at 0; hover the ruler at 2s and press I
+  const ruler = page.locator('.cursor-col-resize')
+  const box = (await ruler.boundingBox())!
+  await page.mouse.move(box.x + 120, box.y + box.height / 2)
+  await page.keyboard.press('i')
+
+  const flag = (await page.getByTestId('mark-i').boundingBox())!
+  // the I flag hangs left of its line, so its right edge sits at the mark
+  expect(flag.x + flag.width - box.x).toBeCloseTo(120, -1)
+  expect(await playheadSeconds(page)).toBe(0)
+
+  // away from the timeline the key falls back to the playhead
+  await page.mouse.move(box.x + 300, 10) // over the preview, off the timeline
+  await page.keyboard.press('i')
+  const moved = (await page.getByTestId('mark-i').boundingBox())!
+  expect(moved.x + moved.width - box.x).toBeCloseTo(0, -1)
 })
 
 test('marks deactivate via a click on the flag or the transport toggle', async ({ page }) => {
@@ -219,6 +240,7 @@ test('the library page lists imports; the editor hides the nav', async ({ page }
   await importVideo(page)
   await expect(page.locator('nav')).toHaveCount(0)
   await page.getByTitle('Library').click()
-  await expect(page.getByText('smoke.webm')).toBeVisible()
-  await expect(page.getByText(/00:0\d\.\d · /)).toBeVisible()
+  // scope to the library grid — mid-transition the editor's media bin still holds the same name
+  await expect(page.locator('main').getByText('smoke.webm')).toBeVisible()
+  await expect(page.locator('main').getByText(/00:0\d\.\d · /)).toBeVisible()
 })

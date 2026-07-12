@@ -70,6 +70,7 @@ export type Action =
   | { type: 'MARK_OUT'; time: number }
   | { type: 'MARK_CLEARED'; which: 'in' | 'out' }
   | { type: 'MARKS_CLEARED' }
+  | { type: 'SPLIT_RANGE' } // razor at both marks: the range becomes its own segment(s), nothing removed
   | { type: 'CUT_RANGE' } // ripple-delete the marked range: trim/drop what's inside, shift what follows
   | { type: 'DRAG_MOVED'; drag: Drag } // ephemeral: writes session only, 1 undo step per gesture
   | { type: 'DRAG_COMMITTED' }
@@ -244,6 +245,30 @@ function reduce(s: State, a: Action): State {
     case 'MARKS_CLEARED':
       return { ...s, session: { ...s.session, markIn: null, markOut: null } }
 
+    case 'SPLIT_RANGE': {
+      const { markIn, markOut } = s.session
+      if (markIn === null || markOut === null) return s
+      const lo = Math.min(markIn, markOut)
+      const hi = Math.max(markIn, markOut)
+      if (hi - lo < 0.1) return s
+      const clips = { ...s.doc.clips }
+      let changed = false
+      for (const t of [lo, hi]) {
+        // fresh snapshot per line: the tail spawned at lo may straddle hi too
+        for (const c of Object.values(clips)) {
+          if (!(c.start + 0.05 < t && t < clipEnd(c) - 0.05)) continue
+          const cut = c.in + (t - c.start)
+          clips[c.id] = { ...c, out: cut }
+          const id = crypto.randomUUID()
+          clips[id] = { ...c, id, start: t, in: cut }
+          changed = true
+        }
+      }
+      if (!changed) return s
+      const next = commit(s, { clips })
+      return { ...next, session: { ...next.session, markIn: null, markOut: null } }
+    }
+
     case 'CUT_RANGE': {
       const { markIn, markOut } = s.session
       if (markIn === null || markOut === null) return s
@@ -371,3 +396,10 @@ export const useEditor = create<State & { dispatch: (a: Action) => void }>((set)
 }))
 
 export const dispatch = (a: Action) => useEditor.getState().dispatch(a)
+
+/**
+ * Where the pointer hovers on the timeline (s), null when off it. A module ref,
+ * not session state: it changes on every mousemove and nothing renders it —
+ * only the I/O keyboard shortcuts read it to mark at the cursor.
+ */
+export const timelineHover = { time: null as number | null }

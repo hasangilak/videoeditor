@@ -228,6 +228,28 @@ describe('cut range', () => {
     }
   })
 
+  it('SPLIT_RANGE razors at both lines, keeping the middle as its own clip', () => {
+    mark(3, 6)
+    dispatch({ type: 'SPLIT_RANGE' })
+
+    const clips = Object.values(state().doc.clips).sort((a, b) => a.start - b.start)
+    expect(clips).toHaveLength(3)
+    expect(clips[0]).toMatchObject({ start: 0, in: 0, out: 3 })
+    expect(clips[1]).toMatchObject({ start: 3, in: 3, out: 6 })
+    expect(clips[2]).toMatchObject({ start: 6, in: 6, out: 10 })
+    expect(state().session).toMatchObject({ markIn: null, markOut: null })
+
+    dispatch({ type: 'UNDO' }) // one undo step for both cuts
+    expect(Object.values(state().doc.clips)).toHaveLength(1)
+  })
+
+  it('SPLIT_RANGE over empty space is a no-op that keeps the marks', () => {
+    mark(15, 20)
+    dispatch({ type: 'SPLIT_RANGE' })
+    expect(Object.values(state().doc.clips)).toHaveLength(1)
+    expect(state().session).toMatchObject({ markIn: 15, markOut: 20 })
+  })
+
   it('clears one mark without touching the other', () => {
     mark(2, 5)
     dispatch({ type: 'MARK_CLEARED', which: 'in' })
