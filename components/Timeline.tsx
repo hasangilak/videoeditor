@@ -262,6 +262,16 @@ export default function Timeline() {
                     <span className="pointer-events-none absolute bottom-1 left-7 font-mono text-[9px] text-white/70 [text-shadow:0_1px_2px_rgba(0,0,0,0.9)]">
                       {fmt(g.out - g.in)}
                     </span>
+                    <button
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={() => dispatch({ type: 'CLIP_REMOVED', clipId: c.id })}
+                      title="Remove clip (Delete)"
+                      className={`absolute top-1 right-7 z-10 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-zinc-900/80 text-xs leading-none text-white/80 transition hover:bg-rose-500 hover:text-white group-hover:opacity-100 ${
+                        selected ? 'opacity-100' : 'opacity-0'
+                      }`}
+                    >
+                      ×
+                    </button>
                     <div
                       onPointerDown={(e) => startClipDrag(e, c, 'trim-l')}
                       className={`absolute inset-y-0 left-0 flex w-6 cursor-ew-resize items-center pl-1 transition group-hover:opacity-100 ${

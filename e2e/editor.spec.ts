@@ -120,6 +120,15 @@ test('delete removes the selected clip', async ({ page }) => {
   await expect(clips(page)).toHaveCount(0)
 })
 
+test('the × button on a selected clip removes it', async ({ page }) => {
+  await importVideo(page)
+  await addClip(page)
+  const clip = clips(page).first()
+  await clip.click() // select — the button becomes visible
+  await clip.getByTitle('Remove clip (Delete)').click()
+  await expect(clips(page)).toHaveCount(0)
+})
+
 test('zoom buttons rescale the timeline', async ({ page }) => {
   await importVideo(page)
   await addClip(page)
