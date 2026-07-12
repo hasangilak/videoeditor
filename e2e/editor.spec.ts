@@ -49,17 +49,22 @@ test('clicking the ruler seeks and the preview renders that frame', async ({ pag
   await expect.poll(() => litPixels(page, '#preview-canvas')).toBeGreaterThan(1000)
 })
 
-test('hovering the timeline shows a frame preview with a timecode', async ({ page }) => {
+test('hovering the ruler shows a frame preview with a timecode', async ({ page }) => {
   await importVideo(page)
   await addClip(page)
-  const clip = clips(page).first()
-  const box = (await clip.boundingBox())!
+  const ruler = page.locator('.cursor-col-resize')
+  const box = (await ruler.boundingBox())!
   await page.mouse.move(box.x + 90, box.y + box.height / 2)
   const thumb = page.getByTestId('hover-thumb')
   await expect(thumb).toBeVisible()
   await expect(thumb.getByText(/\d\d:\d\d\.\d/)).toBeVisible()
   // the hidden scrub video needs a moment to seek before the frame is drawn
   await expect.poll(() => litPixels(page, '[data-testid=hover-thumb] canvas')).toBeGreaterThan(1000)
+
+  // hovering the track area (off the ruler) must not show the preview
+  const clipBox = (await clips(page).first().boundingBox())!
+  await page.mouse.move(clipBox.x + 90, clipBox.y + clipBox.height / 2)
+  await expect(thumb).toBeHidden()
 })
 
 test('split at the playhead, then undo and redo', async ({ page }) => {

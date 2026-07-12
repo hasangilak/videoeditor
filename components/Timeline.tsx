@@ -169,15 +169,17 @@ export default function Timeline() {
   return (
     <div
       ref={scroller}
-      onPointerMove={(e) => setHover(timeAt(e.clientX))}
-      onPointerLeave={() => setHover(null)}
       className="relative overflow-x-auto overflow-y-hidden"
     >
       <div className="relative" style={{ width, height: RULER_H + TRACKS.length * (TRACK_H + 8) + 8 }}>
         {/* ruler — pointer down anywhere on it seeks */}
         <div
           onPointerDown={scrub}
-          onPointerMove={(e) => e.buttons === 1 && dispatch({ type: 'SEEK', time: timeAt(e.clientX) })}
+          onPointerMove={(e) => {
+            setHover(timeAt(e.clientX))
+            if (e.buttons === 1) dispatch({ type: 'SEEK', time: timeAt(e.clientX) })
+          }}
+          onPointerLeave={() => setHover(null)}
           className="sticky top-0 cursor-col-resize"
           style={{ height: RULER_H }}
         >
