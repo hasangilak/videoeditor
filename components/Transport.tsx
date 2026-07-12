@@ -23,7 +23,7 @@ export default function Transport() {
   }
 
   return (
-    <div className="relative flex items-center gap-2 px-4 pb-4 pt-3">
+    <div className="relative flex flex-wrap items-center gap-2 px-4 pb-4 pt-3">
       <button
         onClick={() => dispatch({ type: 'SEEK', time: 0 })}
         className={glass}
@@ -56,11 +56,13 @@ export default function Transport() {
         ✂
       </button>
 
-      {/* center strip: lime pills on dark glass, like the mock's setting chips */}
-      <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-zinc-900/70 p-1.5 backdrop-blur-xl">
+      {/* center strip: lime pills on dark glass, like the mock's setting chips.
+          Viewport-centered on md+; below md it drops into the flow and wraps
+          onto its own centered row so it can't collide with the side buttons */}
+      <div className="mx-auto flex items-center gap-2 rounded-full bg-zinc-900/70 p-1.5 backdrop-blur-xl max-md:order-last md:absolute md:left-1/2 md:-translate-x-1/2">
         <span
           data-testid="timecode"
-          className="rounded-full bg-lime-300 px-4 py-1.5 font-mono text-xs font-semibold tabular-nums text-zinc-900"
+          className="whitespace-nowrap rounded-full bg-lime-300 px-4 py-1.5 font-mono text-xs font-semibold tabular-nums text-zinc-900"
         >
           <span>{fmt(playhead)}</span> / {fmt(duration)}
         </span>

@@ -11,7 +11,10 @@ export default function MediaBin() {
   const items = Object.values(media)
 
   return (
-    <aside className="absolute top-4 right-4 bottom-[320px] z-20 flex w-80 flex-col gap-3 rounded-3xl border border-white/10 bg-zinc-900/70 p-3 shadow-2xl shadow-black/40 backdrop-blur-xl">
+    // bottom offset clears the timeline+transport overlay (taller below md where
+    // the transport wraps to two rows); 60vh floor keeps the bin from collapsing
+    // to zero height in short windows. max-w keeps the left rail reachable.
+    <aside className="absolute top-4 right-4 bottom-[min(320px,60vh)] z-20 flex w-80 max-w-[calc(100vw-96px)] flex-col gap-3 rounded-3xl border border-white/10 bg-zinc-900/70 p-3 shadow-2xl shadow-black/40 backdrop-blur-xl max-md:bottom-[min(380px,60vh)]">
       <div className="flex items-center justify-between">
         <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-400">Media</h2>
         <button

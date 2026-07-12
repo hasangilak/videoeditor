@@ -296,9 +296,9 @@ export default function Timeline() {
           </div>
         )}
 
-        {/* playhead */}
+        {/* playhead — hangs from the scrub line rather than crossing it */}
         <div
-          className="pointer-events-none absolute top-0 bottom-0 z-20 w-px bg-lime-300"
+          className="pointer-events-none absolute top-3 bottom-0 z-20 w-px bg-lime-300"
           style={{ left: playhead * pxPerSec }}
         />
         {/* handle clamped so it stays visible when the playhead sits at 0 */}
