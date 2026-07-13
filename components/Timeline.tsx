@@ -110,6 +110,20 @@ export default function Timeline() {
     return Math.max(0, x / pxPerSec)
   }
 
+  // re-register every render so the resolver closes over the current pxPerSec;
+  // I/O shortcuts call it at keypress time, reading live scroll/zoom state
+  useEffect(() => {
+    timelineHover.timeAt = timeAt
+  })
+  useEffect(
+    () => () => {
+      // pointerleave never fires on unmount — clear by hand or the ref goes stale
+      timelineHover.x = null
+      timelineHover.timeAt = null
+    },
+    [],
+  )
+
   const scrub = (e: React.PointerEvent) => {
     e.currentTarget.setPointerCapture(e.pointerId)
     dispatch({ type: 'PAUSE' })
@@ -196,8 +210,8 @@ export default function Timeline() {
   return (
     <div
       ref={scroller}
-      onPointerMove={(e) => (timelineHover.time = timeAt(e.clientX))}
-      onPointerLeave={() => (timelineHover.time = null)}
+      onPointerMove={(e) => (timelineHover.x = e.clientX)}
+      onPointerLeave={() => (timelineHover.x = null)}
       className="relative overflow-x-auto overflow-y-hidden"
     >
       <div className="relative" style={{ width, height: RULER_H + TRACKS.length * (TRACK_H + 8) + 8 }}>
@@ -205,8 +219,9 @@ export default function Timeline() {
         <div
           onPointerDown={scrub}
           onPointerMove={(e) => {
-            setHover(timeAt(e.clientX))
-            if (e.buttons === 1) dispatch({ type: 'SEEK', time: timeAt(e.clientX) })
+            const t = timeAt(e.clientX)
+            setHover(t)
+            if (e.buttons === 1) dispatch({ type: 'SEEK', time: t })
           }}
           onPointerLeave={() => setHover(null)}
           className="sticky top-0 cursor-col-resize"

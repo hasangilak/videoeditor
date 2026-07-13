@@ -228,9 +228,9 @@ describe('cut range', () => {
     }
   })
 
-  it('SPLIT_RANGE razors at both lines, keeping the middle as its own clip', () => {
+  it('SPLIT razors at both lines, keeping the middle as its own clip', () => {
     mark(3, 6)
-    dispatch({ type: 'SPLIT_RANGE' })
+    dispatch({ type: 'SPLIT' })
 
     const clips = Object.values(state().doc.clips).sort((a, b) => a.start - b.start)
     expect(clips).toHaveLength(3)
@@ -243,11 +243,41 @@ describe('cut range', () => {
     expect(Object.values(state().doc.clips)).toHaveLength(1)
   })
 
-  it('SPLIT_RANGE over empty space is a no-op that keeps the marks', () => {
-    mark(15, 20)
-    dispatch({ type: 'SPLIT_RANGE' })
-    expect(Object.values(state().doc.clips)).toHaveLength(1)
-    expect(state().session).toMatchObject({ markIn: 15, markOut: 20 })
+  it('SPLIT with armed marks cuts only the selected clip', () => {
+    dispatch({ type: 'CLIP_ADDED', mediaId: 'm1', trackId: 'v2' }) // also 0..10
+    const v2 = Object.values(state().doc.clips).find((c) => c.trackId === 'v2')!
+    dispatch({ type: 'SELECT', clipId: v2.id })
+    mark(3, 6)
+    dispatch({ type: 'SPLIT' })
+
+    const byTrack = (t: string) =>
+      Object.values(state().doc.clips).filter((c) => c.trackId === t)
+    expect(byTrack('v2')).toHaveLength(3)
+    expect(byTrack('v1')).toHaveLength(1) // untouched
+  })
+
+  it('SPLIT with a range that razors nothing falls back to the playhead, keeping the marks', () => {
+    dispatch({ type: 'SEEK', time: 5 })
+    mark(0, 10) // both lines sit at clip edges — nothing to razor there
+    dispatch({ type: 'SPLIT' })
+
+    const clips = Object.values(state().doc.clips).sort((a, b) => a.start - b.start)
+    expect(clips).toHaveLength(2)
+    expect(clips[1]).toMatchObject({ start: 5, in: 5, out: 10 })
+    expect(state().session).toMatchObject({ markIn: 0, markOut: 10 })
+  })
+
+  it('SPLIT with a sliver range falls back to the playhead split', () => {
+    dispatch({ type: 'SEEK', time: 5 })
+    mark(4, 4.05)
+    dispatch({ type: 'SPLIT' })
+    expect(Object.values(state().doc.clips)).toHaveLength(2)
+    expect(state().session).toMatchObject({ markIn: 4, markOut: 4.05 })
+  })
+
+  it('marks clamp to the document duration', () => {
+    mark(-3, 25)
+    expect(state().session).toMatchObject({ markIn: 0, markOut: 10 })
   })
 
   it('clears one mark without touching the other', () => {

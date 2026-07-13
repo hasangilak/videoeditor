@@ -52,13 +52,7 @@ export default function Transport() {
       </button>
       {/* with marks set the scissors razor at both lines (nothing removed); otherwise split at the playhead */}
       <button
-        onClick={() =>
-          dispatch(
-            markIn !== null && markOut !== null
-              ? { type: 'SPLIT_RANGE' }
-              : { type: 'SPLIT_AT', time: useEditor.getState().session.playhead },
-          )
-        }
+        onClick={() => dispatch({ type: 'SPLIT' })}
         className={`${glass} ${markIn !== null && markOut !== null ? '!bg-rose-400/80 !text-zinc-900' : ''}`}
         title={
           markIn !== null && markOut !== null
@@ -93,6 +87,16 @@ export default function Transport() {
         title={markOut !== null ? 'Clear cut end' : 'Mark cut end at playhead (O)'}
       >
         O
+      </button>
+      <button
+        onClick={() => dispatch({ type: 'CUT_RANGE' })}
+        disabled={markIn === null || markOut === null || Math.abs(markOut - markIn) < 0.1}
+        className={`${glass} disabled:opacity-40 ${
+          markIn !== null && markOut !== null ? '!bg-rose-400/80 !text-zinc-900' : ''
+        }`}
+        title="Remove the marked range and close the gap (X) — Esc clears marks"
+      >
+        ✖
       </button>
 
       {/* center strip: lime pills on dark glass, like the mock's setting chips.

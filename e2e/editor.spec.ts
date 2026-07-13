@@ -132,6 +132,30 @@ test('pressing I marks at the hovered time, not the playhead', async ({ page }) 
   expect(moved.x + moved.width - box.x).toBeCloseTo(0, -1)
 })
 
+test('pressing I after scrolling the timeline marks under the cursor, not the stale hover', async ({ page }) => {
+  await importVideo(page)
+  await addClip(page)
+  // zoom until the timeline overflows the viewport so it can actually scroll
+  const zoomIn = page.getByRole('button', { name: '+', exact: true })
+  await zoomIn.click()
+  await zoomIn.click()
+  await zoomIn.click()
+
+  const ruler = page.locator('.cursor-col-resize')
+  const box = (await ruler.boundingBox())!
+  const cursorX = box.x + 200
+  await page.mouse.move(cursorX, box.y + box.height / 2)
+  // trackpad-scroll the timeline under the stationary cursor — no pointermove fires
+  await page.mouse.wheel(150, 0)
+  const scroller = page.locator('.overflow-x-auto')
+  await expect.poll(() => scroller.evaluate((el) => el.scrollLeft)).toBeGreaterThan(100)
+  await page.keyboard.press('i')
+
+  // the I flag hangs left of its line, so its right edge sits under the cursor
+  const flag = (await page.getByTestId('mark-i').boundingBox())!
+  expect(flag.x + flag.width).toBeCloseTo(cursorX, -1)
+})
+
 test('marks deactivate via a click on the flag or the transport toggle', async ({ page }) => {
   await importVideo(page)
   await addClip(page)

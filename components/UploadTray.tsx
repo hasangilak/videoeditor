@@ -23,7 +23,9 @@ export default function UploadTray() {
   if (active.length === 0) return null
 
   return (
-    <div className="fixed bottom-24 left-4 z-50 w-72 rounded-2xl border border-white/10 bg-zinc-900/80 p-3 shadow-2xl shadow-black/60 backdrop-blur-xl">
+    // top-left beside the editor rail: the old bottom-left slot floated over the
+    // timeline and swallowed pointer input meant for the clips underneath
+    <div className="fixed top-4 left-20 z-50 w-72 rounded-2xl border border-white/10 bg-zinc-900/80 p-3 shadow-2xl shadow-black/60 backdrop-blur-xl">
       <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-400">
         Uploads
       </h3>

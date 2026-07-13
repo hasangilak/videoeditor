@@ -70,7 +70,7 @@ export type Action =
   | { type: 'MARK_OUT'; time: number }
   | { type: 'MARK_CLEARED'; which: 'in' | 'out' }
   | { type: 'MARKS_CLEARED' }
-  | { type: 'SPLIT_RANGE' } // razor at both marks: the range becomes its own segment(s), nothing removed
+  | { type: 'SPLIT' } // context-sensitive razor: at both marks when armed, else at the playhead
   | { type: 'CUT_RANGE' } // ripple-delete the marked range: trim/drop what's inside, shift what follows
   | { type: 'DRAG_MOVED'; drag: Drag } // ephemeral: writes session only, 1 undo step per gesture
   | { type: 'DRAG_COMMITTED' }
@@ -112,6 +112,33 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), h
 
 function commit(s: State, doc: Doc): State {
   return { ...s, doc, history: { past: [...s.history.past, s.doc], future: [] } }
+}
+
+/**
+ * Razor every clip under t — the selected clip alone when it's under the line.
+ * Mutates the (already-copied) clips record. Cuts at the very edge are ignored —
+ * they'd leave sub-frame slivers. selTail is the id of the tail spawned from the
+ * selected clip, so a second line can stay scoped to the same clip's remainder.
+ */
+function razorAt(
+  clips: Record<string, Clip>,
+  t: number,
+  selection: string | null,
+): { cut: boolean; selTail: string | null } {
+  const under = Object.values(clips).filter(
+    (c) => c.start + 0.05 < t && t < clipEnd(c) - 0.05,
+  )
+  const selected = under.filter((c) => c.id === selection)
+  const targets = selected.length ? selected : under
+  let selTail: string | null = null
+  for (const c of targets) {
+    const cut = c.in + (t - c.start)
+    clips[c.id] = { ...c, out: cut }
+    const id = crypto.randomUUID()
+    clips[id] = { ...c, id, start: t, in: cut }
+    if (c.id === selection) selTail = id
+  }
+  return { cut: targets.length > 0, selTail }
 }
 
 function reduce(s: State, a: Action): State {
@@ -212,28 +239,16 @@ function reduce(s: State, a: Action): State {
     }
 
     case 'SPLIT_AT': {
-      // ignore cuts at the very edge — they'd leave sub-frame slivers
-      const under = Object.values(s.doc.clips).filter(
-        (c) => c.start + 0.05 < a.time && a.time < clipEnd(c) - 0.05,
-      )
-      const selected = under.filter((c) => c.id === s.session.selection)
-      const targets = selected.length ? selected : under
-      if (!targets.length) return s
       const clips = { ...s.doc.clips }
-      for (const c of targets) {
-        const cut = c.in + (a.time - c.start)
-        clips[c.id] = { ...c, out: cut }
-        const id = crypto.randomUUID()
-        clips[id] = { ...c, id, start: a.time, in: cut }
-      }
+      if (!razorAt(clips, a.time, s.session.selection).cut) return s
       return commit(s, { clips })
     }
 
     case 'MARK_IN':
-      return { ...s, session: { ...s.session, markIn: Math.max(0, a.time) } }
+      return { ...s, session: { ...s.session, markIn: clamp(a.time, 0, docDuration(s.doc)) } }
 
     case 'MARK_OUT':
-      return { ...s, session: { ...s.session, markOut: Math.max(0, a.time) } }
+      return { ...s, session: { ...s.session, markOut: clamp(a.time, 0, docDuration(s.doc)) } }
 
     case 'MARK_CLEARED':
       return {
@@ -245,28 +260,28 @@ function reduce(s: State, a: Action): State {
     case 'MARKS_CLEARED':
       return { ...s, session: { ...s.session, markIn: null, markOut: null } }
 
-    case 'SPLIT_RANGE': {
-      const { markIn, markOut } = s.session
-      if (markIn === null || markOut === null) return s
-      const lo = Math.min(markIn, markOut)
-      const hi = Math.max(markIn, markOut)
-      if (hi - lo < 0.1) return s
-      const clips = { ...s.doc.clips }
-      let changed = false
-      for (const t of [lo, hi]) {
-        // fresh snapshot per line: the tail spawned at lo may straddle hi too
-        for (const c of Object.values(clips)) {
-          if (!(c.start + 0.05 < t && t < clipEnd(c) - 0.05)) continue
-          const cut = c.in + (t - c.start)
-          clips[c.id] = { ...c, out: cut }
-          const id = crypto.randomUUID()
-          clips[id] = { ...c, id, start: t, in: cut }
-          changed = true
+    case 'SPLIT': {
+      const { markIn, markOut, selection, playhead } = s.session
+      if (markIn !== null && markOut !== null) {
+        const lo = Math.min(markIn, markOut)
+        const hi = Math.max(markIn, markOut)
+        if (hi - lo >= 0.1) {
+          const clips = { ...s.doc.clips }
+          // razor lo before hi: the tail spawned at lo may straddle hi too,
+          // and when it came from the selected clip the hi cut stays scoped to it
+          const first = razorAt(clips, lo, selection)
+          const second = razorAt(clips, hi, first.selTail ?? selection)
+          if (first.cut || second.cut) {
+            const next = commit(s, { clips })
+            return { ...next, session: { ...next.session, markIn: null, markOut: null } }
+          }
         }
       }
-      if (!changed) return s
-      const next = commit(s, { clips })
-      return { ...next, session: { ...next.session, markIn: null, markOut: null } }
+      // no marks, a sliver range, or a range over empty space: razor at the
+      // playhead instead of going silently dead, and leave the marks alone
+      const clips = { ...s.doc.clips }
+      if (!razorAt(clips, playhead, selection).cut) return s
+      return commit(s, { clips })
     }
 
     case 'CUT_RANGE': {
@@ -398,8 +413,17 @@ export const useEditor = create<State & { dispatch: (a: Action) => void }>((set)
 export const dispatch = (a: Action) => useEditor.getState().dispatch(a)
 
 /**
- * Where the pointer hovers on the timeline (s), null when off it. A module ref,
- * not session state: it changes on every mousemove and nothing renders it —
- * only the I/O keyboard shortcuts read it to mark at the cursor.
+ * Where the pointer hovers on the timeline. A module ref, not session state:
+ * it changes on every mousemove and nothing renders it — only the I/O keyboard
+ * shortcuts read it to mark at the cursor. Stores the raw clientX rather than
+ * a computed time so scrolling/zooming under a stationary pointer can't leave
+ * a stale time; Timeline registers timeAt while mounted and clears it on unmount.
  */
-export const timelineHover = { time: null as number | null }
+export const timelineHover = {
+  x: null as number | null,
+  timeAt: null as ((clientX: number) => number) | null,
+}
+
+/** Hovered timeline time, resolved fresh from live scroll/zoom; null when off the timeline. */
+export const timelineHoverTime = () =>
+  timelineHover.x !== null && timelineHover.timeAt ? timelineHover.timeAt(timelineHover.x) : null

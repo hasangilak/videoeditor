@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useEditor, dispatch, timelineHover } from '@/lib/store'
+import { useEditor, dispatch, timelineHoverTime } from '@/lib/store'
 import { restore, startAutosave } from '@/lib/persist'
 import MediaBin from './MediaBin'
 import Preview from './Preview'
@@ -36,14 +36,13 @@ function useKeyboard() {
       } else if ((e.key === 'Backspace' || e.key === 'Delete') && s.selection) {
         dispatch({ type: 'CLIP_REMOVED', clipId: s.selection })
       } else if (e.key.toLowerCase() === 's' && !e.metaKey && !e.ctrlKey) {
-        // marks armed → S razors at both lines (keeps everything), matching the scissors button
-        if (s.markIn !== null && s.markOut !== null) dispatch({ type: 'SPLIT_RANGE' })
-        else dispatch({ type: 'SPLIT_AT', time: s.playhead })
+        // the reducer razors at both marks when armed, else at the playhead
+        dispatch({ type: 'SPLIT' })
       } else if (e.key.toLowerCase() === 'i' && !e.metaKey && !e.ctrlKey) {
         // mark under the cursor when it's on the timeline, else at the playhead
-        dispatch({ type: 'MARK_IN', time: timelineHover.time ?? s.playhead })
+        dispatch({ type: 'MARK_IN', time: timelineHoverTime() ?? s.playhead })
       } else if (e.key.toLowerCase() === 'o' && !e.metaKey && !e.ctrlKey) {
-        dispatch({ type: 'MARK_OUT', time: timelineHover.time ?? s.playhead })
+        dispatch({ type: 'MARK_OUT', time: timelineHoverTime() ?? s.playhead })
       } else if (e.key.toLowerCase() === 'x' && !e.metaKey && !e.ctrlKey) {
         dispatch({ type: 'CUT_RANGE' })
       } else if (e.key === 'Escape') {
