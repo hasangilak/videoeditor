@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 
 const server = new Server({
   path: '/api/tus',
-  datastore: new FileStore({ directory: './uploads' }),
+  datastore: new FileStore({ directory: process.env.UPLOADS_DIR ?? './uploads' }),
 })
 
 const handler = (req: Request) => server.handleWeb(req)

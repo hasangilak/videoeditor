@@ -20,6 +20,25 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Production (Docker)
+
+Build and run with Docker Compose:
+
+```bash
+docker compose up --build
+```
+
+The app listens on [http://localhost:3000](http://localhost:3000). Uploaded media
+is stored on the `uploads` named volume (mounted at `/data/uploads`), so it
+survives container rebuilds. The upload directory can be changed with the
+`UPLOADS_DIR` environment variable.
+
+A liveness endpoint is available at `/api/health` and is wired into the image's
+`HEALTHCHECK`.
+
+For internet-facing deployments, run a reverse proxy (nginx, Caddy, Traefik)
+in front of the container to handle TLS, request limits, and rate limiting.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
