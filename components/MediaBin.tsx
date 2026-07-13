@@ -83,7 +83,7 @@ export default function MediaBin() {
                   m.upload.state === 'error'
                     ? 'bg-rose-500'
                     : m.upload.state === 'done'
-                      ? 'bg-lime-400'
+                      ? 'bg-lime-300'
                       : m.upload.state === 'paused'
                         ? 'bg-amber-500'
                         : 'bg-lime-300'

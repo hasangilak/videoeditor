@@ -19,7 +19,7 @@ export default function Library() {
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
           {items.map((m) => (
-            <div key={m.id} className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3">
+            <div key={m.id} className="rounded-xl border border-white/10 bg-zinc-900/60 p-3">
               <video src={m.url} muted className="mb-2 aspect-video w-full rounded-lg bg-black object-contain" />
               <p className="truncate text-xs font-medium text-zinc-200">{m.name}</p>
               <p className="mt-1 font-mono text-[10px] text-zinc-500">

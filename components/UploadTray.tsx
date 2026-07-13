@@ -25,8 +25,8 @@ export default function UploadTray() {
   return (
     // top-left beside the editor rail: the old bottom-left slot floated over the
     // timeline and swallowed pointer input meant for the clips underneath
-    <div className="fixed top-4 left-20 z-50 w-72 rounded-2xl border border-white/10 bg-zinc-900/80 p-3 shadow-2xl shadow-black/60 backdrop-blur-xl">
-      <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-400">
+    <div className="fixed top-4 left-20 z-50 w-72 rounded-2xl border border-white/10 bg-zinc-900/70 p-3 shadow-2xl shadow-black/40 backdrop-blur-xl">
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-widest text-zinc-400">
         Uploads
       </h3>
       <div className="flex flex-col gap-2.5">
@@ -38,7 +38,7 @@ export default function UploadTray() {
                 onClick={() =>
                   m.upload.state === 'uploading' ? pauseUpload(m.id) : resumeUpload(m.id)
                 }
-                className="shrink-0 rounded bg-zinc-800 px-2 py-0.5 text-[10px] font-medium text-zinc-300 hover:bg-zinc-700"
+                className="shrink-0 rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] font-medium text-zinc-300 hover:bg-zinc-700"
               >
                 {m.upload.state === 'uploading' ? 'Pause' : m.upload.state === 'error' ? 'Retry' : 'Resume'}
               </button>

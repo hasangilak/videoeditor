@@ -3,9 +3,9 @@ import { useState } from 'react'
 import { useEditor, dispatch, docDuration } from '@/lib/store'
 import { exportTimeline } from '@/lib/export'
 import { fmt } from '@/lib/format'
+import { glassBtn } from '@/lib/ui'
 
-const glass =
-  'flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-zinc-200 backdrop-blur transition hover:bg-white/20'
+const glass = `${glassBtn} h-10 w-10`
 
 export default function Transport() {
   const playing = useEditor((s) => s.session.playing)

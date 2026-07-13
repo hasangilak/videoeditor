@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useEditor, dispatch, timelineHoverTime } from '@/lib/store'
 import { restore, startAutosave } from '@/lib/persist'
+import { glassBtn } from '@/lib/ui'
 import MediaBin from './MediaBin'
 import Preview from './Preview'
 import Transport from './Transport'
@@ -57,8 +58,7 @@ function useKeyboard() {
   }, [])
 }
 
-const rail =
-  'flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-zinc-900/60 text-zinc-300 backdrop-blur-xl transition hover:text-white'
+const rail = `${glassBtn} h-11 w-11`
 
 export default function Editor() {
   usePlaybackEngine()
