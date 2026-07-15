@@ -12,12 +12,19 @@ const SR = 48000 // opus is a 48 kHz codec
 // OfflineAudioContext, and both are muxed into a .webm. Runs faster than
 // realtime and doesn't need the tab visible. Browsers without WebCodecs fall
 // back to recording the preview canvas in realtime (video only).
+//
+// With a clip selected, only that clip's slice of the timeline is exported;
+// otherwise the whole timeline is.
 export function exportTimeline(canvas: HTMLCanvasElement): Promise<void> {
   const s = useEditor.getState()
   if (docDuration(s.doc) === 0 || s.session.playing) return Promise.resolve()
   if (typeof VideoEncoder === 'undefined' || typeof AudioEncoder === 'undefined')
     return exportRealtime(canvas)
-  return exportOffline(s.doc, s.media)
+  const sel = s.session.selection ? s.doc.clips[s.session.selection] : null
+  const range = sel
+    ? { from: sel.start, to: sel.start + (sel.out - sel.in) }
+    : { from: 0, to: docDuration(s.doc) }
+  return exportOffline(s.doc, s.media, range)
 }
 
 function loadVideo(url: string): Promise<HTMLVideoElement> {
@@ -57,15 +64,19 @@ function seekTo(v: HTMLVideoElement, t: number): Promise<void> {
   })
 }
 
+type Range = { from: number; to: number }
+
 /** Every clip's audio placed at its timeline position, mixed to one stereo buffer. */
 async function mixAudio(
   doc: Doc,
   media: Record<string, Media>,
-  duration: number,
+  range: Range,
 ): Promise<AudioBuffer> {
-  const ctx = new OfflineAudioContext(2, Math.ceil(duration * SR), SR)
+  const ctx = new OfflineAudioContext(2, Math.ceil((range.to - range.from) * SR), SR)
   const decoded = new Map<string, AudioBuffer | null>()
   for (const clip of Object.values(doc.clips)) {
+    const clipEnd = clip.start + (clip.out - clip.in)
+    if (clipEnd <= range.from || clip.start >= range.to) continue
     const m = media[clip.mediaId]
     if (!m) continue
     if (!decoded.has(m.id)) {
@@ -81,7 +92,13 @@ async function mixAudio(
     const src = ctx.createBufferSource()
     src.buffer = buf
     src.connect(ctx.destination)
-    src.start(clip.start, clip.in, clip.out - clip.in)
+    // trim the clip to the exported window and shift it to the window's clock
+    const skip = Math.max(range.from - clip.start, 0)
+    src.start(
+      Math.max(clip.start - range.from, 0),
+      clip.in + skip,
+      Math.min(clipEnd, range.to) - Math.max(clip.start, range.from),
+    )
   }
   return ctx.startRendering()
 }
@@ -108,8 +125,8 @@ function encodeAudio(mixed: AudioBuffer, encoder: AudioEncoder) {
   }
 }
 
-async function exportOffline(doc: Doc, media: Record<string, Media>): Promise<void> {
-  const duration = docDuration(doc)
+async function exportOffline(doc: Doc, media: Record<string, Media>, range: Range): Promise<void> {
+  const duration = range.to - range.from
 
   const muxer = new Muxer({
     target: new ArrayBufferTarget(),
@@ -138,9 +155,10 @@ async function exportOffline(doc: Doc, media: Record<string, Media>): Promise<vo
 
   const videos = new Map<string, HTMLVideoElement>()
   try {
-    encodeAudio(await mixAudio(doc, media, duration), audioEncoder)
+    encodeAudio(await mixAudio(doc, media, range), audioEncoder)
 
     for (const clip of Object.values(doc.clips)) {
+      if (clip.start + (clip.out - clip.in) <= range.from || clip.start >= range.to) continue
       const m = media[clip.mediaId]
       if (m && !videos.has(m.id)) videos.set(m.id, await loadVideo(m.url))
     }
@@ -148,7 +166,7 @@ async function exportOffline(doc: Doc, media: Record<string, Media>): Promise<vo
     const frames = Math.ceil(duration * FPS)
     for (let i = 0; i < frames; i++) {
       if (failure) throw failure
-      const t = i / FPS
+      const t = range.from + i / FPS
       ctx.fillStyle = '#000'
       ctx.fillRect(0, 0, W, H)
       for (const clip of activeClips(doc, t)) {
@@ -160,7 +178,7 @@ async function exportOffline(doc: Doc, media: Record<string, Media>): Promise<vo
         const h = v.videoHeight * s
         ctx.drawImage(v, (W - w) / 2, (H - h) / 2, w, h)
       }
-      const frame = new VideoFrame(canvas, { timestamp: t * 1e6, duration: 1e6 / FPS })
+      const frame = new VideoFrame(canvas, { timestamp: (i / FPS) * 1e6, duration: 1e6 / FPS })
       videoEncoder.encode(frame, { keyFrame: i % (FPS * 2) === 0 })
       frame.close()
       // backpressure: don't let raw frames pile up ahead of the encoder

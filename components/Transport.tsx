@@ -14,6 +14,7 @@ export default function Transport() {
   const markIn = useEditor((s) => s.session.markIn)
   const markOut = useEditor((s) => s.session.markOut)
   const duration = useEditor((s) => docDuration(s.doc))
+  const hasSelection = useEditor((s) => s.session.selection !== null)
   const [exporting, setExporting] = useState(false)
   const [exportFailed, setExportFailed] = useState(false)
 
@@ -144,10 +145,18 @@ export default function Transport() {
           title={
             exportFailed
               ? 'Export failed — the browser refused to decode. Retry, or reload the tab.'
-              : 'Render the timeline and save it as .webm'
+              : hasSelection
+                ? 'Render the selected clip and save it as .webm'
+                : 'Render the timeline and save it as .webm'
           }
         >
-          {exporting ? 'Exporting…' : exportFailed ? 'Export failed — retry' : 'Export'}
+          {exporting
+            ? 'Exporting…'
+            : exportFailed
+              ? 'Export failed — retry'
+              : hasSelection
+                ? 'Export clip'
+                : 'Export'}
         </button>
       </div>
 

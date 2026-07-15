@@ -252,12 +252,70 @@ test('the project survives a reload', async ({ page }) => {
 })
 
 test('export downloads a webm of the timeline', async ({ page }) => {
-  test.setTimeout(60_000) // export is realtime: it plays the 4s doc through
+  test.setTimeout(60_000)
   await importVideo(page)
   await addClip(page)
   const download = page.waitForEvent('download', { timeout: 30_000 })
-  await page.getByRole('button', { name: 'Export' }).click()
+  await page.getByRole('button', { name: 'Export', exact: true }).click()
   expect((await download).suggestedFilename()).toBe('export.webm')
+})
+
+test('export with a clip selected downloads only that clip', async ({ page }) => {
+  test.setTimeout(60_000)
+  await importVideo(page)
+  await addClip(page)
+  const total = await page
+    .getByTestId('timecode')
+    .innerText()
+    .then((t) => {
+      const m = t.split('/')[1]!.match(/(\d+):(\d+)\.(\d)/)!
+      return +m[1]! * 60 + +m[2]! + +m[3]! / 10
+    })
+
+  await seekTo(page, 2)
+  await page.keyboard.press('s')
+  await expect(clips(page)).toHaveCount(2)
+
+  // selecting the second piece scopes the export to it
+  await clips(page).nth(1).click()
+  const download = page.waitForEvent('download', { timeout: 30_000 })
+  await page.getByRole('button', { name: 'Export clip' }).click()
+  const path = await (await download).path()
+
+  // load the exported file back into the page: check its duration and that its
+  // first frame shows the source at 2s, not 0s (the test video's background hue
+  // is t*60°, so a green-ish start means the export began at the split)
+  const b64 = (await import('node:fs')).readFileSync(path).toString('base64')
+  const { duration, px } = await page.evaluate(async (b64) => {
+    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))
+    const url = URL.createObjectURL(new Blob([bytes], { type: 'video/webm' }))
+    const v = document.createElement('video')
+    v.muted = true
+    v.src = url
+    await new Promise((res, rej) => {
+      v.onloadedmetadata = res
+      v.onerror = () => rej(new Error('exported webm failed to decode'))
+    })
+    // a streamed webm can report Infinity until forced to scan to the end
+    if (!isFinite(v.duration)) {
+      v.currentTime = 1e6
+      await new Promise((res) => (v.ondurationchange = res))
+    }
+    const duration = v.duration
+    v.currentTime = 0.05
+    await new Promise((res) => (v.onseeked = res))
+    const c = document.createElement('canvas')
+    c.width = v.videoWidth
+    c.height = v.videoHeight
+    const ctx = c.getContext('2d')!
+    ctx.drawImage(v, 0, 0)
+    // sample inside the letterboxed image, clear of the white timestamp text
+    const px = [...ctx.getImageData(c.width / 2, c.height * 0.15, 1, 1).data.slice(0, 3)]
+    URL.revokeObjectURL(url)
+    return { duration, px }
+  }, b64)
+  expect(duration).toBeCloseTo(total - 2, 0) // the piece from the 2s split to the end
+  expect(px[1]!).toBeGreaterThan(px[0]!) // hue ≈120° (green) at 2s; 0s would be red
 })
 
 test('the library page lists imports; the editor hides the nav', async ({ page }) => {
