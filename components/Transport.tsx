@@ -15,13 +15,22 @@ export default function Transport() {
   const markOut = useEditor((s) => s.session.markOut)
   const duration = useEditor((s) => docDuration(s.doc))
   const [exporting, setExporting] = useState(false)
+  const [exportFailed, setExportFailed] = useState(false)
 
   const onExport = async () => {
     const canvas = document.getElementById('preview-canvas')
     if (!(canvas instanceof HTMLCanvasElement)) return
     setExporting(true)
-    await exportTimeline(canvas)
-    setExporting(false)
+    setExportFailed(false)
+    try {
+      await exportTimeline(canvas)
+    } catch (err) {
+      // a failed render must never leave the button stuck on "Exporting…"
+      console.error('[reel] export failed:', err)
+      setExportFailed(true)
+    } finally {
+      setExporting(false)
+    }
   }
 
   return (
@@ -129,10 +138,16 @@ export default function Transport() {
         <button
           onClick={onExport}
           disabled={exporting || playing || duration === 0}
-          className="rounded-full bg-lime-300 px-4 py-1.5 text-xs font-semibold text-zinc-900 transition hover:bg-lime-200 disabled:opacity-40"
-          title="Play the timeline through and save it as .webm"
+          className={`rounded-full px-4 py-1.5 text-xs font-semibold text-zinc-900 transition disabled:opacity-40 ${
+            exportFailed ? 'bg-rose-400 hover:bg-rose-300' : 'bg-lime-300 hover:bg-lime-200'
+          }`}
+          title={
+            exportFailed
+              ? 'Export failed — the browser refused to decode. Retry, or reload the tab.'
+              : 'Render the timeline and save it as .webm'
+          }
         >
-          {exporting ? 'Exporting…' : 'Export'}
+          {exporting ? 'Exporting…' : exportFailed ? 'Export failed — retry' : 'Export'}
         </button>
       </div>
 
